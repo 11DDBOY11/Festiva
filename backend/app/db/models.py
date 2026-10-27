@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models — Phase 1: users and events only.
+"""SQLAlchemy ORM models — Phase 1: users, events, and refresh_tokens.
 
 The full schema (plan_versions, vendor_directory, etc.) lands in Phase 2.
 """
@@ -31,6 +31,27 @@ class User(Base):
         back_populates="owner",
         cascade="all, delete-orphan",
     )
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    jti: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="refresh_tokens")
 
 
 class Event(Base):

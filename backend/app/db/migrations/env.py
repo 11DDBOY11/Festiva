@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.base import Base
 
 # Register every model so Base.metadata is complete
-from app.db.models import Event, User  # noqa: F401
+from app.db.models import Event, RefreshToken, User  # noqa: F401
 
 config = context.config
 

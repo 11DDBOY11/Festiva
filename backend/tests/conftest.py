@@ -1,34 +1,36 @@
-"""Test configuration and fixtures for Festiva AI backend."""
+"""Test configuration and fixtures for Festiva AI backend targeting PostgreSQL."""
 
+import os
 from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_db
+from app.core.config import settings
 from app.db.base import Base
 from app.main import app
 
-# In-memory SQLite for fast, isolated tests
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Target PostgreSQL database for testing
+DATABASE_URL = os.getenv("TEST_DATABASE_URL", settings.TEST_DATABASE_URL)
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+    DATABASE_URL,
+    pool_pre_ping=True,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(autouse=True)
 def setup_database() -> Generator[None, None, None]:
-    """Create fresh tables for every test and drop them afterwards."""
+    """Ensure schema is created on PostgreSQL, truncate data after each test."""
     Base.metadata.create_all(bind=engine)
     yield
-    Base.metadata.drop_all(bind=engine)
+    with engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
 
 
 @pytest.fixture
