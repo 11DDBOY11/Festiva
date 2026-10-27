@@ -216,3 +216,42 @@ export async function deleteEvent(id: string): Promise<void> {
     throw new Error("Failed to delete event");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Brief Parser API Endpoints
+// ---------------------------------------------------------------------------
+
+export interface EventBrief {
+  title: string;
+  event_type: "wedding" | "birthday" | "community";
+  event_date: string | null;
+  city: string;
+  guest_count: number | null;
+  total_budget: number | null;
+  currency: string;
+  theme?: string | null;
+  dietary_preferences?: string[];
+  priorities?: string[];
+  constraints?: string[];
+  raw_brief?: string | null;
+  missing_fields: string[];
+  clarifying_questions: string[];
+}
+
+export interface BriefParseResponse {
+  brief: EventBrief;
+  clarifying_questions: string[];
+  needs_clarification: boolean;
+}
+
+export async function parseBrief(rawText: string): Promise<BriefParseResponse> {
+  const res = await fetchWithAuth("/briefs/parse", {
+    method: "POST",
+    body: JSON.stringify({ raw_text: rawText }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to parse celebration brief");
+  }
+  return res.json();
+}

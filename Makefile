@@ -20,4 +20,8 @@ demo:
 	@echo "Demo script not yet implemented (Phase 6)"
 
 eval:
-	@echo "Eval harness not yet implemented (Phase 3)"
+	python backend/tests/evals/eval_brief_parser.py --replay
+
+eval-live:
+	python backend/tests/evals/eval_brief_parser.py --live
+

@@ -37,7 +37,11 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- LLM ---
-    LLM_PROVIDER: str = "fake"  # fake | openai | gemini
+    LLM_PROVIDER: str = "groq"  # groq | fake | openai | gemini
+    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     LLM_API_KEY: str = ""
 
     @model_validator(mode="after")

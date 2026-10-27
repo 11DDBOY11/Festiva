@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.briefs import router as briefs_router
 from app.api.events import router as events_router
 from app.core.config import DEFAULT_SECRETS, settings
 
@@ -43,6 +44,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(events_router)
+app.include_router(briefs_router)
 
 
 @app.get("/health", tags=["system"])

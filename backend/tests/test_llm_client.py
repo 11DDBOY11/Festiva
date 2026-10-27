@@ -35,3 +35,10 @@ def test_get_llm_client_factory() -> None:
 
     with pytest.raises(ValueError, match="Unknown LLM provider"):
         get_llm_client(provider="invalid_provider")
+
+
+def test_groq_llm_client_requires_key() -> None:
+    from app.ai.llm_client import GroqLLMClient
+
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY is not configured"):
+        GroqLLMClient(api_key="")

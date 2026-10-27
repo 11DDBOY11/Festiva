@@ -1,0 +1,121 @@
+[
+  {
+    "id": "brief_01",
+    "name": "Standard Coastal Wedding",
+    "raw_text": "We are planning a grand coastal wedding in Kadri, Mangaluru on 2026-11-20 for 250 guests. Our total budget is 15 lakhs. Need traditional Mangalorean catering, fresh floral mandap, and candid photography.",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 250,
+      "total_budget": 1500000.0,
+      "event_date": "2026-11-20",
+      "city": "Mangaluru",
+      "needs_clarification": false
+    }
+  },
+  {
+    "id": "brief_02",
+    "name": "Incomplete 50th Birthday (Missing Budget)",
+    "raw_text": "Planning my father's 50th birthday dinner in Bejai on 2026-12-15. We are expecting around 60 close family and friends. Want nice coastal appetizers and a cake.",
+    "expected": {
+      "event_type": "birthday",
+      "guest_count": 60,
+      "event_date": "2026-12-15",
+      "needs_clarification": true,
+      "expected_missing": ["total_budget"]
+    }
+  },
+  {
+    "id": "brief_03",
+    "name": "Community Cultural Festival (Missing Date)",
+    "raw_text": "Organizing an annual Tuluva cultural samithi evening in Urwa for roughly 400 community members. We have a sanctioned budget of 2.5 lakhs for stage and sound.",
+    "expected": {
+      "event_type": "community",
+      "guest_count": 400,
+      "total_budget": 250000.0,
+      "needs_clarification": true,
+      "expected_missing": ["event_date"]
+    }
+  },
+  {
+    "id": "brief_04",
+    "name": "Luxury Beachside Wedding",
+    "raw_text": "Destination beach wedding at Panambur on 2026-12-10 with 500 guests. Total budget is 35 lakhs. We want luxury seaside decor, live counters, and drone cinematography.",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 500,
+      "total_budget": 3500000.0,
+      "event_date": "2026-12-10",
+      "needs_clarification": false
+    }
+  },
+  {
+    "id": "brief_05",
+    "name": "Kids 1st Birthday (Missing Date)",
+    "raw_text": "Need a fun jungle safari themed 1st birthday party for our baby boy with 35 guests in Kadri. Budget is around 50000 rupees. Need balloons and entertainment.",
+    "expected": {
+      "event_type": "birthday",
+      "guest_count": 35,
+      "total_budget": 50000.0,
+      "needs_clarification": true,
+      "expected_missing": ["event_date"]
+    }
+  },
+  {
+    "id": "brief_06",
+    "name": "Vague Brief (Missing Multiple Critical Fields)",
+    "raw_text": "Hey Festiva, I want to host a birthday party in Mangaluru next month. What can you do?",
+    "expected": {
+      "event_type": "birthday",
+      "needs_clarification": true,
+      "expected_missing": ["guest_count", "total_budget", "event_date"]
+    }
+  },
+  {
+    "id": "brief_07",
+    "name": "Large Temple Samithi Lunch",
+    "raw_text": "Community anna santharpana lunch at Car Street Mangaluru on 2027-01-14. Expecting 1200 devotees. Sanctioned budget is 4 lakhs for pure veg banana leaf meal.",
+    "expected": {
+      "event_type": "community",
+      "guest_count": 1200,
+      "total_budget": 400000.0,
+      "event_date": "2027-01-14",
+      "needs_clarification": false
+    }
+  },
+  {
+    "id": "brief_08",
+    "name": "Intimate Reception in Balmatta",
+    "raw_text": "Intimate wedding reception dinner in Balmatta hall on 2026-11-28 for 120 guests. Total budget is 6 lakhs. Looking for buffet catering and light acoustic music.",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 120,
+      "total_budget": 600000.0,
+      "event_date": "2026-11-28",
+      "needs_clarification": false
+    }
+  },
+  {
+    "id": "brief_09",
+    "name": "Silver Wedding Anniversary (Missing Guest Count)",
+    "raw_text": "25th wedding anniversary celebration on 2026-10-30 in Kodialbail. Our budget is 3.5 lakhs with cocktail starters and live band, but guest list is still being finalized.",
+    "expected": {
+      "event_type": "wedding",
+      "total_budget": 350000.0,
+      "event_date": "2026-10-30",
+      "needs_clarification": true,
+      "expected_missing": ["guest_count"]
+    }
+  },
+  {
+    "id": "brief_10",
+    "name": "Yakshagana & Youth Sports Meet",
+    "raw_text": "Youth sports meet and Yakshagana performance in Kottara grounds on 2026-12-24 for 200 members with budget of 1 lakh. Need sound setup and stage lights.",
+    "expected": {
+      "event_type": "community",
+      "guest_count": 200,
+      "total_budget": 100000.0,
+      "event_date": "2026-12-24",
+      "needs_clarification": false
+    }
+  }
+]
