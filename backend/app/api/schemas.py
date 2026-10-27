@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 # Auth
 # ---------------------------------------------------------------------------
 
+
 class UserRegister(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
@@ -43,6 +44,7 @@ class UserResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Events
 # ---------------------------------------------------------------------------
+
 
 class EventCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)

@@ -13,6 +13,7 @@ from app.core.config import settings
 # Password helpers
 # ---------------------------------------------------------------------------
 
+
 def hash_password(password: str) -> str:
     """Return a bcrypt hash of *password*."""
     pw_bytes = password.encode("utf-8")[:72]
@@ -30,6 +31,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ---------------------------------------------------------------------------
 # JWT helpers (PyJWT)
 # ---------------------------------------------------------------------------
+
 
 def create_access_token(user_id: UUID) -> str:
     """Short-lived token for API access."""

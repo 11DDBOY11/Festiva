@@ -35,9 +35,7 @@ def list_events(
 ) -> list[Event]:
     """List all events owned by the current user, newest first."""
     return list(
-        db.execute(
-            select(Event).where(Event.owner_id == user.id).order_by(Event.created_at.desc())
-        )
+        db.execute(select(Event).where(Event.owner_id == user.id).order_by(Event.created_at.desc()))
         .scalars()
         .all()
     )

@@ -15,10 +15,7 @@ from app.core.config import DEFAULT_SECRETS, settings
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and shutdown lifecycle handler."""
     # Fail startup if JWT_SECRET is the default value when ENV != dev
-    is_default = (
-        settings.JWT_SECRET in DEFAULT_SECRETS
-        or settings.SECRET_KEY in DEFAULT_SECRETS
-    )
+    is_default = settings.JWT_SECRET in DEFAULT_SECRETS or settings.SECRET_KEY in DEFAULT_SECRETS
     if settings.ENV != "dev" and is_default:
         raise RuntimeError(
             f"Cannot start in '{settings.ENV}' environment with default JWT_SECRET / SECRET_KEY. "

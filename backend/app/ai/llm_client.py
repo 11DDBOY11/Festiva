@@ -57,12 +57,14 @@ class FakeLLMClient(LLMClient):
         system_prompt: str | None = None,
         **kwargs: Any,
     ) -> str:
-        self.call_history.append({
-            "type": "text",
-            "prompt": prompt,
-            "system_prompt": system_prompt,
-            "kwargs": kwargs,
-        })
+        self.call_history.append(
+            {
+                "type": "text",
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "kwargs": kwargs,
+            }
+        )
         return self.default_response
 
     def generate_structured(
@@ -72,13 +74,15 @@ class FakeLLMClient(LLMClient):
         system_prompt: str | None = None,
         **kwargs: Any,
     ) -> T:
-        self.call_history.append({
-            "type": "structured",
-            "model": response_model.__name__,
-            "prompt": prompt,
-            "system_prompt": system_prompt,
-            "kwargs": kwargs,
-        })
+        self.call_history.append(
+            {
+                "type": "structured",
+                "model": response_model.__name__,
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "kwargs": kwargs,
+            }
+        )
         if response_model in self.structured_responses:
             return self.structured_responses[response_model]  # type: ignore[return-value]
         # Attempt to construct default model instance if possible
