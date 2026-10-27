@@ -7,11 +7,12 @@ import {
   Sparkles,
   MapPin,
   CircleDollarSign,
-  ArrowUpRight,
   X,
   AlertCircle,
   HelpCircle,
   Wand2,
+  Clock,
+  CheckSquare,
 } from "lucide-react";
 import {
   EventItem,
@@ -39,12 +40,14 @@ export const EventsPage: React.FC = () => {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedResult, setParsedResult] = useState<BriefParseResponse | null>(null);
 
-  // Editable Form State (synced from AI brief or manual)
+  // Editable Form State
   const [newTitle, setNewTitle] = useState("");
   const [newEventType, setNewEventType] = useState<"wedding" | "birthday" | "community">("wedding");
   const [newEventDate, setNewEventDate] = useState("");
   const [newGuestCount, setNewGuestCount] = useState<string>("150");
   const [newTotalBudget, setNewTotalBudget] = useState<string>("500000");
+
+  const isDev = import.meta.env.DEV || import.meta.env.VITE_ENV === "dev";
 
   const loadEvents = async () => {
     try {
@@ -136,32 +139,60 @@ export const EventsPage: React.FC = () => {
     }).format(amount);
   };
 
+  // Next Upcoming Event calculation
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingEvents = events
+    .filter((e) => e.event_date && new Date(e.event_date) >= today)
+    .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime());
+
+  const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+  const daysUntilNext = nextEvent
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(nextEvent.event_date!).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      )
+    : null;
+
+  // Active (non-draft) count
+  const activeEventsCount = events.filter((e) => e.status !== "draft").length;
+
   const getEventTypeBadge = (type: string) => {
     switch (type) {
       case "wedding":
-        return "bg-rose-500/10 text-rose-300 border-rose-500/20";
+        return "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20";
       case "birthday":
-        return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+        return "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20";
       case "community":
-        return "bg-blue-500/10 text-blue-300 border-blue-500/20";
+        return "bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20";
       default:
-        return "bg-slate-500/10 text-slate-300 border-slate-500/20";
+        return "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-500/10 dark:text-slate-300 dark:border-slate-500/20";
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Top Header & Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <span>Celebrations & Plans</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Celebrations & Plans
+            </h1>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20">
               Mangaluru Copilot
             </span>
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Budget-aware events powered by verified local vendors and deterministic rules.
+            {isDev && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                20 sample vendors
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+            Plan weddings, birthdays and community events within your budget.
           </p>
         </div>
 
@@ -170,70 +201,99 @@ export const EventsPage: React.FC = () => {
             resetModalState();
             setIsModalOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 text-slate-950 font-semibold text-sm hover:brightness-110 active:brightness-95 transition shadow-lg shadow-amber-500/20 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 text-slate-950 font-bold text-sm hover:brightness-105 active:brightness-95 transition shadow-md shadow-amber-500/20 cursor-pointer self-start sm:self-auto"
         >
           <Sparkles className="w-4 h-4 text-slate-950" />
           <span>New Celebration</span>
         </button>
       </div>
 
-      {/* Overview Stats */}
+      {/* Overview Stats: Next Upcoming, Total Planned Budget, Tasks Due This Week */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
-            Active Celebrations
+        {/* Card 1: Next Upcoming Event */}
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+            <span>Next Upcoming Event</span>
+            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-bold text-white">{events.length}</div>
+          {nextEvent ? (
+            <div>
+              <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate" title={nextEvent.title}>
+                {nextEvent.title}
+              </div>
+              <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mt-1">
+                {daysUntilNext === 0
+                  ? "Today!"
+                  : `In ${daysUntilNext} day${daysUntilNext === 1 ? "" : "s"} (${nextEvent.event_date})`}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-base sm:text-lg font-bold text-slate-700 dark:text-slate-300">
+                No upcoming dates
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Set a target date on your celebration
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
-            Total Budget Managed
+        {/* Card 2: Total Planned Budget */}
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+            <span>Total Planned Budget</span>
+            <CircleDollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-bold text-amber-400">
+          <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
             {formatINR(events.reduce((sum, e) => sum + (e.total_budget || 0), 0))}
           </div>
+          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+            Across {events.length} planned celebration{events.length === 1 ? "" : "s"} ({activeEventsCount} active)
+          </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
-            Estimated Total Guests
+        {/* Card 3: Tasks Due This Week */}
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+            <span>Tasks Due This Week</span>
+            <CheckSquare className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           </div>
-          <div className="text-2xl font-bold text-white">
-            {events.reduce((sum, e) => sum + (e.guest_count || 0), 0).toLocaleString()}
+          <div className="text-2xl font-bold text-slate-900 dark:text-white">0</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+            Task tracker unlocks in Phase 9
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
       {error && (
-        <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-400" />
+        <div className="mb-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-800 dark:text-rose-300 text-sm flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
           <span>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <div className="glass-panel rounded-2xl p-12 text-center border border-slate-800">
-          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Loading your Mangaluru celebrations...</p>
+        <div className="glass-panel rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-600 dark:text-slate-400">Loading your Mangaluru celebrations...</p>
         </div>
       ) : events.length === 0 ? (
-        <div className="glass-panel rounded-2xl p-12 text-center border border-dashed border-slate-800 max-w-lg mx-auto">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+        <div className="glass-panel rounded-2xl p-8 sm:p-12 text-center border border-dashed border-slate-300 dark:border-slate-800 max-w-lg mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-semibold text-white mb-1">No Celebrations Yet</h3>
-          <p className="text-sm text-slate-400 mb-6">
-            Describe your event in plain English (e.g. 250 guests wedding in Kadri for 15 lakhs) or
-            enter details directly.
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">No Celebrations Yet</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+            Describe your event in plain English or enter details directly to start your plan.
           </p>
           <button
             onClick={() => {
               resetModalState();
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition border border-slate-700"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-sm font-semibold transition"
           >
             <Plus className="w-4 h-4 text-amber-400" />
             <span>Create Your First Event</span>
@@ -244,7 +304,7 @@ export const EventsPage: React.FC = () => {
           {events.map((event) => (
             <div
               key={event.id}
-              className="glass-panel rounded-2xl p-6 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between group shadow-sm hover:shadow-xl"
+              className="glass-panel rounded-2xl p-6 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between group shadow-sm hover:shadow-md"
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
@@ -255,55 +315,67 @@ export const EventsPage: React.FC = () => {
                   >
                     {event.event_type}
                   </span>
-                  <span className="text-xs text-slate-500 font-mono">
-                    v{event.current_version || 1}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {/* Status Badge */}
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {event.status === "draft" ? "Draft" : "Active"}
+                    </span>
+                    {/* Plan Version Tag (Clearer label, only if version exists) */}
+                    {event.current_version && (
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono font-medium">
+                        Plan v{event.current_version}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition mb-3 line-clamp-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition mb-3 line-clamp-1">
                   {event.title}
                 </h3>
 
-                <div className="space-y-2 text-sm text-slate-300 mb-6">
+                <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300 mb-6">
                   <div className="flex items-center gap-2">
-                    <CircleDollarSign className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-semibold text-slate-100">
+                    <CircleDollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
                       {formatINR(event.total_budget)}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                    <Users className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
                     <span>{event.guest_count ? `${event.guest_count} Guests` : "Guest count unset"}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                    <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
                     <span>{event.event_date ? event.event_date : "Date to be decided"}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                     <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span>{event.city || "Mangaluru"}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
                 <button
                   onClick={() => handleDelete(event.id, event.title)}
-                  className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition"
+                  className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-1.5 rounded-lg transition"
                   title="Delete celebration"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
 
+                {/* View Plan disabled with tooltip until Phase 4 */}
                 <button
-                  onClick={() => alert(`Phase 4 will open full plan view for "${event.title}".`)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 transition"
+                  type="button"
+                  disabled={true}
+                  title="Coming soon in Phase 4"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg cursor-not-allowed transition"
                 >
-                  <span>Open Copilot</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>View Plan</span>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">(Phase 4)</span>
                 </button>
               </div>
             </div>
@@ -313,31 +385,31 @@ export const EventsPage: React.FC = () => {
 
       {/* Create Event Modal with AI Brief Parser */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="glass-panel w-full max-w-xl rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl glow-gold relative my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-panel w-full max-w-lg rounded-2xl p-5 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-2xl glow-gold relative my-4 sm:my-8 bg-white dark:bg-slate-900">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg transition"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="mb-5">
-              <span className="text-xs font-semibold text-amber-400 uppercase tracking-widest">
+            <div className="mb-4 sm:mb-5">
+              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
                 Event Intake
               </span>
-              <h2 className="text-xl font-bold text-white mt-1">Start New Celebration</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">Start New Celebration</h2>
             </div>
 
             {/* Intake Tabs */}
-            <div className="flex rounded-xl bg-slate-900/80 p-1 border border-slate-800 mb-6">
+            <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/80 mb-5">
               <button
                 type="button"
                 onClick={() => setModalTab("ai")}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   modalTab === "ai"
-                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-semibold shadow-md"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
                 <Wand2 className="w-3.5 h-3.5" />
@@ -346,10 +418,10 @@ export const EventsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setModalTab("manual")}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
                   modalTab === "manual"
-                    ? "bg-slate-800 text-slate-100 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
                 Direct Manual Form
@@ -357,24 +429,24 @@ export const EventsPage: React.FC = () => {
             </div>
 
             {modalTab === "ai" && (
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3.5 mb-5">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
                     <span>Describe your celebration in plain text</span>
-                    <span className="text-[11px] text-slate-500">FastAPI POST /briefs/parse</span>
+                    <span className="text-[11px] text-slate-500 font-normal">FastAPI POST /briefs/parse</span>
                   </label>
                   <textarea
                     rows={3}
                     value={rawBriefText}
                     onChange={(e) => setRawBriefText(e.target.value)}
                     placeholder="e.g. Planning a wedding in Kadri, Mangaluru on Nov 20, 2026 for 250 guests with a budget of 15 lakhs. Need Mangalorean catering and floral decor."
-                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
                   />
                 </div>
 
                 {/* Quick Samples */}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-slate-500 text-[11px]">Quick samples:</span>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-500 text-[11px] font-medium">Quick samples:</span>
                   <button
                     type="button"
                     onClick={() =>
@@ -382,7 +454,7 @@ export const EventsPage: React.FC = () => {
                         "Planning a coastal wedding in Kadri, Mangaluru on 2026-11-20 for 250 guests with a budget of 15 lakhs. Need traditional catering and candid photography."
                       )
                     }
-                    className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition text-[11px]"
+                    className="px-2 py-0.5 rounded-lg bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-300 transition text-[11px]"
                   >
                     Coastal Wedding (15L)
                   </button>
@@ -393,7 +465,7 @@ export const EventsPage: React.FC = () => {
                         "Father's 50th birthday dinner in Bejai on 2026-12-15 with 60 family guests. Need coastal appetizers and cake."
                       )
                     }
-                    className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition text-[11px]"
+                    className="px-2 py-0.5 rounded-lg bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-300 transition text-[11px]"
                   >
                     50th Bday (Missing Budget)
                   </button>
@@ -403,7 +475,7 @@ export const EventsPage: React.FC = () => {
                   type="button"
                   disabled={parsingBrief || !rawBriefText.trim()}
                   onClick={handleParseBrief}
-                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 font-semibold text-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 border border-slate-700 text-amber-400 font-semibold text-xs transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {parsingBrief ? (
                     <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -416,38 +488,38 @@ export const EventsPage: React.FC = () => {
                 </button>
 
                 {parseError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
                     <span>{parseError}</span>
                   </div>
                 )}
 
                 {/* Clarifying Questions Callout */}
                 {parsedResult && parsedResult.clarifying_questions.length > 0 && (
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-                      <HelpCircle className="w-4 h-4 text-amber-400" />
+                  <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300">
+                      <HelpCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                       <span>Clarifying Questions from Copilot:</span>
                     </div>
-                    <ul className="space-y-1.5 pl-6 list-disc text-xs text-slate-300">
+                    <ul className="space-y-1.5 pl-6 list-disc text-xs text-slate-800 dark:text-slate-300">
                       {parsedResult.clarifying_questions.map((q, idx) => (
                         <li key={idx} className="leading-relaxed">
                           {q}
                         </li>
                       ))}
                     </ul>
-                    <p className="text-[11px] text-amber-400/80 pt-1">
-                      Please confirm or fill in the details below before creating your plan:
+                    <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium pt-1">
+                      Please confirm or fill in the parameters below before creating your plan:
                     </p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Event Form (Populated by AI or direct entry) */}
-            <form onSubmit={handleCreate} className="space-y-4">
+            {/* Event Form */}
+            <form onSubmit={handleCreate} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Celebration Title
                 </label>
                 <input
@@ -456,19 +528,19 @@ export const EventsPage: React.FC = () => {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="e.g. Priya & Rahul's Coastal Wedding"
-                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Celebration Type
                   </label>
                   <select
                     value={newEventType}
                     onChange={(e: any) => setNewEventType(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
                   >
                     <option value="wedding">Wedding</option>
                     <option value="birthday">Birthday</option>
@@ -477,21 +549,21 @@ export const EventsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Target Date
                   </label>
                   <input
                     type="date"
                     value={newEventDate}
                     onChange={(e) => setNewEventDate(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Expected Guests
                   </label>
                   <input
@@ -500,12 +572,12 @@ export const EventsPage: React.FC = () => {
                     value={newGuestCount}
                     onChange={(e) => setNewGuestCount(e.target.value)}
                     placeholder="150"
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Total Budget (₹ INR)
                   </label>
                   <input
@@ -515,23 +587,23 @@ export const EventsPage: React.FC = () => {
                     value={newTotalBudget}
                     onChange={(e) => setNewTotalBudget(e.target.value)}
                     placeholder="500000"
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition"
+                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading || !newTitle.trim()}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-semibold text-sm hover:brightness-110 shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-sm hover:brightness-105 shadow-md shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
                 >
                   {createLoading ? "Creating..." : "Confirm & Create Event"}
                 </button>
