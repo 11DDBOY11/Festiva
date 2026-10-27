@@ -169,8 +169,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             </button>
           </form>
 
-          {/* Quick Demo Helper */}
-          {isLogin && (
+          {/* Quick Demo Helper - Only visible when ENV=dev */}
+          {isLogin && (import.meta.env.DEV || import.meta.env.VITE_ENV === "dev") && (
             <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
               <button
                 type="button"

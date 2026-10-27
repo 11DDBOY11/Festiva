@@ -73,8 +73,15 @@ def seed_vendors(db: Session) -> int:
                 verified_on=item.get("verified_on"),
                 confidence=item.get("confidence", "medium"),
                 contact=item.get("contact"),
+                sample=item.get("sample", True),
             )
             db.add(v)
+            count += 1
+        else:
+            existing.name = item["name"]
+            existing.contact = item.get("contact")
+            existing.sample = item.get("sample", True)
+            existing.source_url = item.get("source_url")
             count += 1
     db.commit()
     return count

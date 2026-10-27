@@ -56,7 +56,24 @@ A budget-aware, RAG-powered celebration and event planning copilot for Mangaluru
 | `make lint`   | Run Ruff linter                    |
 | `make migrate`| Apply Alembic migrations           |
 | `make demo`   | Run the demo script (Phase 6)      |
-| `make eval`   | Run the eval harness (Phase 3)     |
+| `make eval`   | Run the eval harness (Phase 3/6)   |
+
+## Implementation Roadmap (12 Phases)
+
+| Phase | Focus | Key Deliverables & Exit Criteria |
+| :--- | :--- | :--- |
+| **Phase 1** | Foundation & Auth | Monorepo, Postgres + pgvector, FastAPI, JWT auth with token rotation, events CRUD, React PWA shell, CI with lint and tests, LLMClient interface. |
+| **Phase 2** | Full Schema & Seed | Full schema migrations, budget rules engine (wedding/birthday/community), 20 sample Mangaluru vendors, Pydantic models & validators. |
+| **Phase 3** | Brief Parser & Evals | Structured brief parser, clarifying-question loop, plan JSON schema, 10 eval briefs (live + replay), UI brief intake. |
+| **Phase 4** | Plan Generation & UI | Deterministic budget engine, timeline generator, vendor category checklist, full plan viewer UI. |
+| **Phase 5** | Plan Versioning & MVP | Immutable plan_versions, proposed_changes diff viewer (accept/reject), chat refinement, PDF export. MVP Birthday demo runs end-to-end. |
+| **Phase 6** | Evaluation Harness | Complete 25-brief eval suite with accuracy/repair metrics; CI regression harness. |
+| **Phase 7** | RAG Ingestion Pipeline| Chunking & embedding pipeline, CLI ingestion, pgvector index, metadata-filtered retrieval, 50+ vendors loaded. recall@5 >= 80%. |
+| **Phase 8** | Vendor Features | Vendor shortlist & comparison UI, grounding validators, price honesty verification. Grounding = 100%. |
+| **Phase 9** | Operations & Guests | Operational tracking: expenses, tasks with owners, guests & RSVP tracking, vendor message drafting. |
+| **Phase 10**| Background Jobs | Email reminders for due tasks, read-only share link for family, RBAC. |
+| **Phase 11**| Hardening & Security | Rate limits, input sanitizing, prompt-injection tests, error states, cost tracking. |
+| **Phase 12**| Production & Demo | Public deployment, seed data, final demo video, architecture documentation, before/after eval report. |
 
 ## Architecture
 

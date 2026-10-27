@@ -13,6 +13,7 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -97,6 +98,7 @@ class Vendor(Base):
     verified_on: Mapped[date | None] = mapped_column(nullable=True)
     confidence: Mapped[str] = mapped_column(String(20), default="medium")  # high | medium | low
     contact: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    sample: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class KnowledgeChunk(Base):
@@ -185,7 +187,7 @@ class PlanVersion(Base):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     plan: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    created_by: Mapped[str] = mapped_column(String(20), default="ai")  # user | ai
+    created_by: Mapped[str] = mapped_column(Text, default="ai")  # user | ai
     change_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False

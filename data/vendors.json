@@ -1,7 +1,7 @@
 [
   {
     "id": "e1a2b3c4-0001-4000-8000-000000000001",
-    "name": "[Sample] TMA Pai International Convention Centre",
+    "name": "[Sample] Mangala Heritage Grand Convention Centre",
     "category": "venue",
     "area": "MG Road",
     "city": "Mangaluru",
@@ -11,10 +11,15 @@
     "price_high": 250000,
     "price_unit": "flat",
     "tags": ["air-conditioned", "grand wedding", "parking", "banquet hall"],
-    "source_url": "https://example.com/sample-tma-pai",
+    "source_url": "https://festiva-sample-data.internal/vendors/v01",
     "verified_on": "2026-10-15",
     "confidence": "high",
-    "contact": { "note": "Sample record - call management desk" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0001",
+      "email": "sample.mangala@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0002-4000-8000-000000000002",
@@ -28,14 +33,19 @@
     "price_high": 120000,
     "price_unit": "flat",
     "tags": ["outdoor", "lawn", "open-air evening", "wedding", "birthday"],
-    "source_url": "https://example.com/sample-kadri-lawn",
+    "source_url": "https://festiva-sample-data.internal/vendors/v02",
     "verified_on": "2026-10-10",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0002",
+      "email": "sample.kadrilawn@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0003-4000-8000-000000000003",
-    "name": "[Sample] Ocean Pearl Grand Ballroom",
+    "name": "[Sample] Kudla Crystal Grand Ballroom",
     "category": "venue",
     "area": "Kodialbail",
     "city": "Mangaluru",
@@ -45,10 +55,15 @@
     "price_high": 90000,
     "price_unit": "flat",
     "tags": ["indoor banquet", "hotel hall", "birthday", "corporate"],
-    "source_url": "https://example.com/sample-ocean-pearl",
+    "source_url": "https://festiva-sample-data.internal/vendors/v03",
     "verified_on": "2026-09-28",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0003",
+      "email": "sample.kudlacrystal@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0004-4000-8000-000000000004",
@@ -62,10 +77,15 @@
     "price_high": 50000,
     "price_unit": "flat",
     "tags": ["budget friendly", "community events", "non-ac hall"],
-    "source_url": "https://example.com/sample-bejai-hall",
+    "source_url": "https://festiva-sample-data.internal/vendors/v04",
     "verified_on": "2026-10-01",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0004",
+      "email": "sample.bejaihall@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0005-4000-8000-000000000005",
@@ -79,14 +99,19 @@
     "price_high": 850,
     "price_unit": "per_plate",
     "tags": ["Mangalorean coastal", "vegetarian", "non-vegetarian", "live counter"],
-    "source_url": "https://example.com/sample-kudla-rasoi",
+    "source_url": "https://festiva-sample-data.internal/vendors/v05",
     "verified_on": "2026-10-12",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0005",
+      "email": "sample.kudlarasoi@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0006-4000-8000-000000000006",
-    "name": "[Sample] Shri Krishna Shuddh Veg Caterers",
+    "name": "[Sample] Mangala Shuddh Veg Caterers",
     "category": "caterer",
     "area": "Car Street",
     "city": "Mangaluru",
@@ -96,14 +121,19 @@
     "price_high": 600,
     "price_unit": "per_plate",
     "tags": ["pure veg", "brahmin style", "traditional banana leaf", "wedding"],
-    "source_url": "https://example.com/sample-shri-krishna",
+    "source_url": "https://festiva-sample-data.internal/vendors/v06",
     "verified_on": "2026-10-05",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0006",
+      "email": "sample.mangalaveg@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0007-4000-8000-000000000007",
-    "name": "[Sample] Mangalore Feast & Bites",
+    "name": "[Sample] Coastal Feast & Bites",
     "category": "caterer",
     "area": "Balmatta",
     "city": "Mangaluru",
@@ -113,10 +143,15 @@
     "price_high": 550,
     "price_unit": "per_plate",
     "tags": ["birthday buffet", "continental", "finger food", "mocktails"],
-    "source_url": "https://example.com/sample-feast-bites",
+    "source_url": "https://festiva-sample-data.internal/vendors/v07",
     "verified_on": "2026-10-08",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0007",
+      "email": "sample.feastbites@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0008-4000-8000-000000000008",
@@ -130,10 +165,15 @@
     "price_high": 250000,
     "price_unit": "flat",
     "tags": ["fresh floral", "mandap design", "stage backdrop", "lighting"],
-    "source_url": "https://example.com/sample-blossom-drapes",
+    "source_url": "https://festiva-sample-data.internal/vendors/v08",
     "verified_on": "2026-10-18",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0008",
+      "email": "sample.blossomdrapes@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0009-4000-8000-000000000009",
@@ -147,10 +187,15 @@
     "price_high": 45000,
     "price_unit": "flat",
     "tags": ["balloon arch", "themed birthday", "neon signs", "photo booth"],
-    "source_url": "https://example.com/sample-party-decor",
+    "source_url": "https://festiva-sample-data.internal/vendors/v09",
     "verified_on": "2026-10-02",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0009",
+      "email": "sample.partydecor@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0010-4000-8000-000000000010",
@@ -164,10 +209,15 @@
     "price_high": 90000,
     "price_unit": "flat",
     "tags": ["marigold & banana stem", "traditional tuluva", "community stage"],
-    "source_url": "https://example.com/sample-tulunad-mandap",
+    "source_url": "https://festiva-sample-data.internal/vendors/v10",
     "verified_on": "2026-09-30",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0010",
+      "email": "sample.tulunadmandap@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0011-4000-8000-000000000011",
@@ -181,10 +231,15 @@
     "price_high": 140000,
     "price_unit": "flat",
     "tags": ["candid photography", "cinematic video", "drone coverage", "album"],
-    "source_url": "https://example.com/sample-lights-shadows",
+    "source_url": "https://festiva-sample-data.internal/vendors/v11",
     "verified_on": "2026-10-14",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0011",
+      "email": "sample.lightsshadows@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0012-4000-8000-000000000012",
@@ -198,10 +253,15 @@
     "price_high": 40000,
     "price_unit": "flat",
     "tags": ["birthday photoshoot", "reels coverage", "instant prints"],
-    "source_url": "https://example.com/sample-pixelcraft",
+    "source_url": "https://festiva-sample-data.internal/vendors/v12",
     "verified_on": "2026-10-09",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0012",
+      "email": "sample.pixelcraft@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0013-4000-8000-000000000013",
@@ -215,14 +275,19 @@
     "price_high": 45000,
     "price_unit": "flat",
     "tags": ["hd bridal makeup", "saree draping", "hair styling", "airbrush"],
-    "source_url": "https://example.com/sample-glamour-touch",
+    "source_url": "https://festiva-sample-data.internal/vendors/v13",
     "verified_on": "2026-10-11",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0013",
+      "email": "sample.glamourtouch@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0014-4000-8000-000000000014",
-    "name": "[Sample] Roopa Herbal Beauty Parlour",
+    "name": "[Sample] Karavali Herbal Beauty Parlour",
     "category": "makeup_attire",
     "area": "Lalbagh",
     "city": "Mangaluru",
@@ -232,10 +297,15 @@
     "price_high": 18000,
     "price_unit": "flat",
     "tags": ["party makeup", "mehendi night", "hairstyling"],
-    "source_url": "https://example.com/sample-roopa-beauty",
+    "source_url": "https://festiva-sample-data.internal/vendors/v14",
     "verified_on": "2026-09-25",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0014",
+      "email": "sample.karavalibeauty@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0015-4000-8000-000000000015",
@@ -249,10 +319,15 @@
     "price_high": 50000,
     "price_unit": "flat",
     "tags": ["line array audio", "bollywood dj", "sangeet night", "smoke machine"],
-    "source_url": "https://example.com/sample-mangalore-beats",
+    "source_url": "https://festiva-sample-data.internal/vendors/v15",
     "verified_on": "2026-10-16",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0015",
+      "email": "sample.mangalorebeats@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0016-4000-8000-000000000016",
@@ -266,10 +341,15 @@
     "price_high": 25000,
     "price_unit": "flat",
     "tags": ["podium audio", "conference sound", "community hall pa"],
-    "source_url": "https://example.com/sample-soundwave",
+    "source_url": "https://festiva-sample-data.internal/vendors/v16",
     "verified_on": "2026-10-04",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0016",
+      "email": "sample.soundwave@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0017-4000-8000-000000000017",
@@ -283,10 +363,15 @@
     "price_high": 25000,
     "price_unit": "flat",
     "tags": ["airport pickup", "tempo traveller", "guest shuttle", "ac buses"],
-    "source_url": "https://example.com/sample-coastal-cabs",
+    "source_url": "https://festiva-sample-data.internal/vendors/v17",
     "verified_on": "2026-10-06",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0017",
+      "email": "sample.coastalcabs@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0018-4000-8000-000000000018",
@@ -300,10 +385,15 @@
     "price_high": 8000,
     "price_unit": "flat",
     "tags": ["fondant birthday cake", "wedding tiered cake", "dessert table"],
-    "source_url": "https://example.com/sample-cake-studio",
+    "source_url": "https://festiva-sample-data.internal/vendors/v18",
     "verified_on": "2026-10-17",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0018",
+      "email": "sample.cakestudio@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0019-4000-8000-000000000019",
@@ -317,10 +407,15 @@
     "price_high": 180000,
     "price_unit": "flat",
     "tags": ["beachfront", "sunset celebration", "destination wedding"],
-    "source_url": "https://example.com/sample-panambur-pavilion",
+    "source_url": "https://festiva-sample-data.internal/vendors/v19",
     "verified_on": "2026-10-13",
     "confidence": "medium",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0019",
+      "email": "sample.panamburpavilion@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   },
   {
     "id": "e1a2b3c4-0020-4000-8000-000000000020",
@@ -334,9 +429,14 @@
     "price_high": 110000,
     "price_unit": "flat",
     "tags": ["jasmine gate", "carnation canopy", "welcome entryway", "wedding"],
-    "source_url": "https://example.com/sample-swarna-floral",
+    "source_url": "https://festiva-sample-data.internal/vendors/v20",
     "verified_on": "2026-10-15",
     "confidence": "high",
-    "contact": { "note": "Sample record" }
+    "sample": true,
+    "contact": {
+      "phone": "+91 824 000 0020",
+      "email": "sample.swarnafloral@festiva-demo.internal",
+      "note": "Fictional sample record for development and testing"
+    }
   }
 ]
