@@ -19,7 +19,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.ai.brief_parser import parse_brief  # noqa: E402
-from app.ai.llm_client import FakeLLMClient, GroqLLMClient, LLMClient  # noqa: E402
+from app.ai.llm_client import GroqLLMClient, LLMClient  # noqa: E402
 from app.domain.schemas import EventBrief  # noqa: E402
 
 DATASET_PATH = EVALS_DIR / "dataset.json"
@@ -60,7 +60,7 @@ class ReplayLLMClient(LLMClient):
 
 
 def run_evals(mode: str = "replay") -> int:
-    """Run evaluation benchmark across 10 sample briefs."""
+    """Run evaluation benchmark across briefs with honest scoring and loud live failures."""
     if not DATASET_PATH.exists():
         print(f"Error: dataset not found at {DATASET_PATH}")
         return 1
@@ -73,35 +73,44 @@ def run_evals(mode: str = "replay") -> int:
         with open(RECORDINGS_PATH, encoding="utf-8") as f:
             recordings = json.load(f)
 
-    # Configure client based on mode
+    # Configure client based on mode - NO silent fallback in live mode
     client: LLMClient
     if mode == "live":
         try:
             client = GroqLLMClient()
             print("[INFO] Running in LIVE mode with GroqLLMClient.")
         except Exception as exc:
-            print(f"[WARN] Live client initialization failed: {exc}. Using Fake.")
-            client = FakeLLMClient()
+            print(f"\n[FATAL] Live client initialization failed: {exc}")
+            print(
+                "Live mode requires a valid GROQ_API_KEY. "
+                "Refusing silent fallback to FakeLLMClient."
+            )
+            return 1
     else:
         print("[INFO] Running in REPLAY mode with committed recordings.")
         client = ReplayLLMClient(recordings=recordings)
 
-    total_valid_schema = 0
-    total_no_repair = 0
-    total_correct_clarifications = 0
+    # Metrics tracking (headline excludes synthetic fixtures)
+    headline_valid_schema = 0
+    headline_no_repair = 0
+    headline_correct_clarifications = 0
+    headline_passed = 0
+    headline_count = 0
+
+    synthetic_count = 0
     total_briefs = len(dataset)
 
-    print("\n" + "=" * 88)
-    print(
-        f"{'ID':<10} {'Brief Name':<26} {'Schema':<8} {'Repair':<8} "
-        f"{'Clarification':<14} {'Result'}"
-    )
-    print("=" * 88)
+    results_table = []
 
     for item in dataset:
         brief_id = item["id"]
         raw_text = item["raw_text"]
         expected = item["expected"]
+
+        is_synthetic = False
+        if mode == "replay":
+            rec_entry = recordings.get(brief_id, {})
+            is_synthetic = bool(rec_entry.get("synthetic", False))
 
         if isinstance(client, ReplayLLMClient):
             client.set_current_id(brief_id)
@@ -109,9 +118,10 @@ def run_evals(mode: str = "replay") -> int:
         schema_valid = False
         repaired = False
         clarification_correct = False
+        notes = []
 
         try:
-            res = parse_brief(raw_text=raw_text, client=client)
+            res = parse_brief(raw_text=raw_text, client=client, allow_fallback=(mode != "live"))
             brief = res.brief
             schema_valid = isinstance(brief, EventBrief)
 
@@ -123,34 +133,77 @@ def run_evals(mode: str = "replay") -> int:
                         m in brief.missing_fields for m in expected["expected_missing"]
                     )
                     clarification_correct = missing_match
+                    if not missing_match:
+                        notes.append(
+                            f"missing mismatch: got {brief.missing_fields}, "
+                            f"expected {expected['expected_missing']}"
+                        )
                 else:
                     clarification_correct = True
+            else:
+                clarification_correct = False
+                notes.append(
+                    f"needs_clarification got {res.needs_clarification}, "
+                    f"expected {exp_needs_clarification}"
+                )
 
-            # If running live with real client and recording, save output
-            if mode == "live" and schema_valid and not isinstance(client, FakeLLMClient):
-                recordings[brief_id] = json.loads(brief.model_dump_json())
+            # Check expected event_type if specified
+            if "event_type" in expected and brief.event_type != expected["event_type"]:
+                notes.append(
+                    f"event_type got {brief.event_type}, expected {expected['event_type']}"
+                )
+
+            # Save live response without synthetic flag
+            if mode == "live" and schema_valid:
+                dumped = json.loads(brief.model_dump_json())
+                dumped["synthetic"] = False
+                recordings[brief_id] = dumped
 
         except ValidationError as val_err:
-            print(f"Validation error on {brief_id}: {val_err}")
+            notes.append(f"Validation error: {val_err}")
+            repaired = True
+        except RuntimeError as rt_err:
+            if mode == "live":
+                print(f"\n[FATAL] Live LLM call failed loudly on {brief_id}: {rt_err}")
+                print("No silent fallback permitted in live mode.")
+                return 1
+            notes.append(f"Runtime error: {rt_err}")
             repaired = True
         except Exception as err:
-            print(f"Execution error on {brief_id}: {err}")
+            if mode == "live":
+                print(f"\n[FATAL] Unexpected live error on {brief_id}: {err}")
+                return 1
+            notes.append(f"Execution error: {err}")
             repaired = True
 
-        if schema_valid:
-            total_valid_schema += 1
-        if schema_valid and not repaired:
-            total_no_repair += 1
-        if clarification_correct:
-            total_correct_clarifications += 1
+        passed = schema_valid and clarification_correct
 
-        status_str = "PASS" if (schema_valid and clarification_correct) else "FAIL"
-        print(
-            f"{brief_id:<10} {item['name'][:26]:<28} "
-            f"{'YES' if schema_valid else 'NO':<8} "
-            f"{'NO' if not repaired else 'YES':<8} "
-            f"{'ACCURATE' if clarification_correct else 'INEXACT':<14} "
-            f"{status_str}"
+        if is_synthetic:
+            synthetic_count += 1
+        else:
+            headline_count += 1
+            if schema_valid:
+                headline_valid_schema += 1
+            if schema_valid and not repaired:
+                headline_no_repair += 1
+            if clarification_correct:
+                headline_correct_clarifications += 1
+            if passed:
+                headline_passed += 1
+
+        status_str = "PASS" if passed else "FAIL"
+        type_str = "[SYNTHETIC]" if is_synthetic else "[LIVE/REAL]"
+        results_table.append(
+            (
+                brief_id,
+                item["name"],
+                schema_valid,
+                not repaired,
+                clarification_correct,
+                status_str,
+                type_str,
+                notes,
+            )
         )
 
     # Save live recordings if updated
@@ -158,34 +211,67 @@ def run_evals(mode: str = "replay") -> int:
         RECORDINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(RECORDINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(recordings, f, indent=2)
-        print(f"[INFO] Updated live recordings at {RECORDINGS_PATH}")
+        print(
+            f"[INFO] Successfully captured {len(recordings)} live recordings to {RECORDINGS_PATH}\n"
+        )
 
-    # Summary metrics
-    schema_pct = (total_valid_schema / total_briefs) * 100
-    repair_free_pct = (total_no_repair / total_briefs) * 100
-    clarification_pct = (total_correct_clarifications / total_briefs) * 100
+    # Output detailed report
+    print("\n" + "=" * 94)
+    print(
+        f"{'ID':<10} {'Brief Name':<28} {'Type':<12} {'Schema':<8} "
+        f"{'Repair-Free':<12} {'Clarification':<14} {'Result'}"
+    )
+    print("=" * 94)
+    for b_id, name, s_valid, r_free, c_corr, res_str, t_str, notes in results_table:
+        print(
+            f"{b_id:<10} {name[:26]:<28} {t_str:<12} "
+            f"{'YES' if s_valid else 'NO':<8} "
+            f"{'YES' if r_free else 'NO':<12} "
+            f"{'ACCURATE' if c_corr else 'INEXACT':<14} "
+            f"{res_str}"
+        )
+        if notes:
+            for note in notes:
+                print(f"   |-> Note: {note}")
 
-    print("=" * 90)
-    print("PHASE 3 EVALUATION SUMMARY METRICS:")
-    print(f"  • Total Briefs Tested:         {total_briefs}")
+    print("=" * 94)
+    print("EVALUATION METRICS REPORT:")
+    print(f"  - Total Briefs Tested:         {total_briefs}")
     print(
-        f"  • Valid Schema Rate:           {schema_pct:.1f}% ({total_valid_schema}/{total_briefs})"
+        f"  - Headline Evaluated Briefs:   {headline_count} "
+        f"(synthetic fixtures excluded: {synthetic_count})"
     )
-    print(
-        f"  • Repair-Free Parsing Rate:    {repair_free_pct:.1f}% "
-        f"({total_no_repair}/{total_briefs}) [Target: >= 80%]"
-    )
-    print(
-        f"  • Clarification Accuracy Rate: {clarification_pct:.1f}% "
-        f"({total_correct_clarifications}/{total_briefs})"
-    )
-    print("=" * 90)
+    if headline_count > 0:
+        schema_pct = (headline_valid_schema / headline_count) * 100
+        repair_pct = (headline_no_repair / headline_count) * 100
+        clarif_pct = (headline_correct_clarifications / headline_count) * 100
+        pass_pct = (headline_passed / headline_count) * 100
+        print(
+            f"  - Headline Valid Schema Rate:  {schema_pct:.1f}% "
+            f"({headline_valid_schema}/{headline_count})"
+        )
+        print(
+            f"  - Headline Repair-Free Rate:   {repair_pct:.1f}% "
+            f"({headline_no_repair}/{headline_count})"
+        )
+        print(
+            f"  - Headline Clarification Acc:  {clarif_pct:.1f}% "
+            f"({headline_correct_clarifications}/{headline_count})"
+        )
+        print(
+            f"  - Headline Overall Pass Rate:  {pass_pct:.1f}% "
+            f"({headline_passed}/{headline_count})"
+        )
+    print("=" * 94 + "\n")
 
-    if total_no_repair >= 8:
-        print("[SUCCESS] Phase 3 Brief Parser exit criteria met (>= 8/10 parsed without repair)!\n")
+    if headline_no_repair >= min(8, headline_count):
+        print(
+            f"[SUCCESS] Brief Parser criteria met "
+            f"({headline_no_repair}/{headline_count} parsed without repair)!\n"
+        )
         return 0
     else:
-        print("[FAIL] Less than 8 briefs parsed without repair.\n")
+        print(f"[FAIL] Less than {min(8, headline_count)} briefs parsed without repair.\n")
         return 1
 
 

@@ -28,7 +28,7 @@ from app.domain.schemas import (
     EventBrief,
     PlanSchema,
 )
-from app.domain.timeline import generate_timeline
+from app.domain.timeline import check_timeline_compression, generate_timeline
 from app.domain.validators import (
     validate_plan_budget,
     validate_plan_dates,
@@ -152,23 +152,70 @@ def _personalise_plan(
     """Personalise theme and menu via LLM with 1 repair retry, falling back to rules."""
     llm = client or get_llm_client()
 
+    is_veg = any(
+        "veg" in d.lower() or "satvik" in d.lower() or "jain" in d.lower() for d in dietary
+    )
+    dietary_instruction = ""
+    if is_veg:
+        dietary_instruction = (
+            "\nCRITICAL DIETARY RESTRICTION: The host specified STRICTLY VEGETARIAN catering. "
+            "Every single dish in 'menu_ideas' MUST be 100% vegetarian "
+            "(e.g., Neer Dosa with Veg Kurma, Udupi Saaru, Kadale Manoli Sukka, "
+            "Pathrode, Moong Dal Payasa, Holige). "
+            "ABSOLUTELY NO chicken, fish, prawn, meat, seafood, or Kori Rotti.\n"
+        )
+
     user_prompt = (
         f"Event Type: {event_type}\n"
         f"Guest Count: {guest_count or 'Not specified'}\n"
         f"Total Budget: INR {total_budget:,.0f}\n"
         f"Dietary Preferences: {', '.join(dietary) if dietary else 'Standard Coastal'}\n"
         f"Priorities: {', '.join(priorities) if priorities else 'Balanced experience'}\n"
-        f"User Brief Notes: {raw_brief or 'None'}\n\n"
+        f"User Brief Notes: {raw_brief or 'None'}\n"
+        f"{dietary_instruction}\n"
         "Generate creative theme, executive summary, regional menu items, and vendor fit reasons."
     )
 
+    non_veg_keywords = [
+        "chicken",
+        "fish",
+        "prawn",
+        "kori",
+        "mutton",
+        "meat",
+        "pork",
+        "beef",
+        "seafood",
+        "anjal",
+        "squid",
+        "crab",
+    ]
+
+    def _sanitize_menu(p: PlanPersonalisation) -> PlanPersonalisation:
+        if is_veg:
+            clean_menu = []
+            for dish in p.menu_ideas:
+                if not any(kw in dish.lower() for kw in non_veg_keywords):
+                    clean_menu.append(dish)
+            if not clean_menu:
+                clean_menu = [
+                    "Traditional Udupi Saaru & Rice",
+                    "Neer Dosa with Veg Kurma",
+                    "Kadale Manoli Sukka",
+                    "Pathrode with Chutney",
+                    "Elaneer Payasa",
+                ]
+            p.menu_ideas = clean_menu
+        return p
+
     # Attempt 1
     try:
-        return llm.generate_structured(
+        res = llm.generate_structured(
             prompt=user_prompt,
             response_model=PlanPersonalisation,
             system_prompt=PERSONALISATION_SYSTEM_PROMPT,
         )
+        return _sanitize_menu(res)
     except Exception as exc:
         logger.warning(f"Plan personalisation attempt 1 failed ({exc}); attempting repair retry...")
 
@@ -179,11 +226,12 @@ def _personalise_plan(
             "IMPORTANT: Return strictly valid JSON conforming to the schema with keys: "
             "'theme', 'summary', 'menu_ideas' (list of strings), 'vendor_reasons' (dict)."
         )
-        return llm.generate_structured(
+        res = llm.generate_structured(
             prompt=repair_prompt,
             response_model=PlanPersonalisation,
             system_prompt=PERSONALISATION_SYSTEM_PROMPT,
         )
+        return _sanitize_menu(res)
     except Exception as exc2:
         logger.warning(
             f"Plan personalisation repair retry failed ({exc2}); using rules-only fallback."
@@ -279,8 +327,13 @@ def generate_plan(
         categories=budget_allocations,
     )
 
-    # 2. Deterministic Timeline Generator
+    # 2. Deterministic Timeline Generator & Compression Check
     timeline = generate_timeline(
+        event_type=clean_type,
+        event_date=event_date,
+        reference_today=reference_today,
+    )
+    is_compressed, timeline_warning = check_timeline_compression(
         event_type=clean_type,
         event_date=event_date,
         reference_today=reference_today,
@@ -314,6 +367,10 @@ def generate_plan(
         if vcat in personalisation.vendor_reasons:
             v.reason = personalisation.vendor_reasons[vcat]
 
+    plan_summary = personalisation.summary
+    if is_compressed and timeline_warning:
+        plan_summary = f"{plan_summary} Note: {timeline_warning}"
+
     plan = PlanSchema(
         version=1,
         title=title,
@@ -322,7 +379,7 @@ def generate_plan(
         guest_count=guest_count,
         total_budget=budget_plan.total_budget,
         currency="INR",
-        summary=personalisation.summary,
+        summary=plan_summary,
         budget=budget_breakdown,
         timeline=timeline,
         checklist=checklist,
@@ -334,6 +391,8 @@ def generate_plan(
             "menu_ideas": personalisation.menu_ideas,
             "dietary_preferences": dietary,
             "priorities": prios,
+            "compressed_timeline": is_compressed,
+            "timeline_warning": timeline_warning,
         },
     )
 

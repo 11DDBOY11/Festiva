@@ -166,3 +166,78 @@ def test_event_plan_endpoints(client: TestClient) -> None:
     v2_data = regen_res.json()
     assert v2_data["version"] == 2
     assert v2_data["event_id"] == event_id
+
+
+class BrokenLLMClient:
+    """Client that simulates malformed or invalid output to test repair and fallback paths."""
+
+    def __init__(self, fail_count: int = 1) -> None:
+        self.attempts = 0
+        self.fail_count = fail_count
+
+    def generate(self, prompt: str, system_prompt: str | None = None, **kwargs) -> str:
+        return "invalid"
+
+    def generate_structured(
+        self,
+        prompt: str,
+        response_model: type,
+        system_prompt: str | None = None,
+        **kwargs,
+    ):
+        self.attempts += 1
+        if self.attempts <= self.fail_count:
+            raise ValueError(f"Simulated malformed LLM response on attempt {self.attempts}")
+        from app.domain.plan_generator import PlanPersonalisation
+
+        return PlanPersonalisation(
+            theme="Repaired Theme",
+            summary="Repaired summary",
+            menu_ideas=["Repaired Dish"],
+            vendor_reasons={},
+        )
+
+
+def test_personalisation_repair_and_fallback_on_bad_output() -> None:
+    """Verify that repair retry and rules fallback paths trigger when LLM output is invalid."""
+    # Case 1: First attempt fails, repair retry succeeds
+    repaired_client = BrokenLLMClient(fail_count=1)
+    plan_repaired = generate_plan(
+        event_type="wedding",
+        total_budget=Decimal("500000.00"),
+        client=repaired_client,  # type: ignore[arg-type]
+    )
+    assert repaired_client.attempts == 2
+    assert plan_repaired.meta["theme"] == "Repaired Theme"
+
+    # Case 2: Both attempts fail -> triggers rules-only fallback
+    broken_client = BrokenLLMClient(fail_count=999)
+    plan_fallback = generate_plan(
+        event_type="wedding",
+        total_budget=Decimal("500000.00"),
+        dietary_preferences=["veg only"],
+        client=broken_client,  # type: ignore[arg-type]
+    )
+    assert broken_client.attempts == 2
+    assert plan_fallback.meta["theme"] == "Traditional Coastal Grand Wedding"
+    assert "Udupi Saaru" in plan_fallback.meta["menu_ideas"][0]
+    # Verify vegetarian constraint strictly respected in fallback menu
+    for dish in plan_fallback.meta["menu_ideas"]:
+        assert not any(meat in dish.lower() for meat in ["chicken", "fish", "prawn", "kori"])
+
+
+def test_compressed_timeline_warning_and_milestones() -> None:
+    """Verify that an event 10 days away generates compressed timeline warning & milestones."""
+    today = date.today()
+    event_date = today + timedelta(days=10)
+    plan = generate_plan(
+        event_type="wedding",
+        total_budget=Decimal("500000.00"),
+        event_date=event_date,
+        reference_today=today,
+    )
+    assert plan.meta.get("compressed_timeline") is True
+    assert "Compressed timeline advisory" in plan.meta.get("timeline_warning", "")
+    assert "Compressed timeline advisory" in plan.summary
+    # Verify expedited tasks are marked
+    assert any("Expedited" in item.phase for item in plan.timeline)

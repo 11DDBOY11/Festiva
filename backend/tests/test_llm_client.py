@@ -37,8 +37,13 @@ def test_get_llm_client_factory() -> None:
         get_llm_client(provider="invalid_provider")
 
 
-def test_groq_llm_client_requires_key() -> None:
+def test_groq_llm_client_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.ai.llm_client import GroqLLMClient
 
     with pytest.raises(RuntimeError, match="GROQ_API_KEY is not configured"):
         GroqLLMClient(api_key="")
+
+    monkeypatch.setattr("app.ai.llm_client.settings.GROQ_API_KEY", "")
+    monkeypatch.setattr("app.ai.llm_client.settings.LLM_API_KEY", "")
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY is not configured"):
+        GroqLLMClient()

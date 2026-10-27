@@ -116,14 +116,12 @@ class GroqLLMClient(LLMClient):
         api_key: str | None = None,
         model: str | None = None,
     ) -> None:
-        key = api_key or settings.GROQ_API_KEY or settings.LLM_API_KEY
+        key = api_key if api_key is not None else (settings.GROQ_API_KEY or settings.LLM_API_KEY)
         if not key:
             raise RuntimeError(
                 "GROQ_API_KEY is not configured. Set GROQ_API_KEY in your .env file "
                 "or export it in your environment."
             )
-        self.model = model or settings.LLM_MODEL or "llama-3.3-70b-versatile"
-
         # Lazy import of groq package
         try:
             from groq import Groq
@@ -131,6 +129,24 @@ class GroqLLMClient(LLMClient):
             self.client = Groq(api_key=key)
         except ImportError:
             raise RuntimeError("The 'groq' package is not installed. Run 'pip install groq'.")
+
+        self.model = model or settings.LLM_MODEL or "openai/gpt-oss-120b"
+        # Verify model availability on current Groq account and pick best available chat model
+        try:
+            available_ids = [m.id for m in self.client.models.list().data]
+            if self.model not in available_ids:
+                candidates = [
+                    "openai/gpt-oss-120b",
+                    "llama-3.3-70b-versatile",
+                    "qwen/qwen3.8-27b",
+                    "openai/gpt-oss-20b",
+                ]
+                for cand in candidates:
+                    if cand in available_ids:
+                        self.model = cand
+                        break
+        except Exception as list_err:
+            logger.debug("Could not verify available models: %s", list_err)
 
     def generate(
         self,

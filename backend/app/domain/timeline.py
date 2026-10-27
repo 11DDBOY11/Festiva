@@ -172,6 +172,30 @@ TIMELINE_TEMPLATES: dict[str, list[tuple[int, str, str, str, str]]] = {
 }
 
 
+def check_timeline_compression(
+    event_type: str,
+    event_date: date | None,
+    reference_today: date | None = None,
+) -> tuple[bool, str | None]:
+    """Determine whether the schedule is compressed due to insufficient lead time."""
+    if not event_date:
+        return False, None
+    today = reference_today or date.today()
+    days_available = (event_date - today).days
+    clean_type = event_type.lower().strip() if event_type else "wedding"
+    templates = TIMELINE_TEMPLATES.get(clean_type, TIMELINE_TEMPLATES["wedding"])
+    max_lead_days = max(days for days, _, _, _, _ in templates)
+
+    if days_available < max_lead_days:
+        return (
+            True,
+            f"Compressed timeline advisory: Event is in {days_available} days "
+            f"(standard {clean_type} lead time is {max_lead_days} days). Tasks have been "
+            "expedited into a compressed schedule; confirm venue and key vendor bookings urgently.",
+        )
+    return False, None
+
+
 def generate_timeline(
     event_type: str,
     event_date: date | None,
@@ -183,6 +207,7 @@ def generate_timeline(
     - If event_date is provided, every task has a target_date.
     - reference_today <= target_date <= event_date for all tasks.
     - Strict chronological order (target_date ascending).
+    - If lead time is less than standard template duration, marks compressed tasks.
     """
     clean_type = event_type.lower().strip() if event_type else "wedding"
     templates = TIMELINE_TEMPLATES.get(clean_type, TIMELINE_TEMPLATES["wedding"])
@@ -210,10 +235,11 @@ def generate_timeline(
     # If event_date is in the future, count backward and clamp to today
     total_days_available = max(0, (event_date - today).days)
 
-    raw_items: list[tuple[date, int, str, str, str, str]] = []
+    raw_items: list[tuple[date, int, str, str, str, str, bool]] = []
 
     for days_before, task, category, priority, owner in templates:
         # Proportionally compress or clamp days_before if event is on short notice
+        is_expedited = days_before > total_days_available
         effective_days_before = min(days_before, total_days_available)
         calculated_date = event_date - timedelta(days=effective_days_before)
 
@@ -223,7 +249,9 @@ def generate_timeline(
         if calculated_date > event_date:
             calculated_date = event_date
 
-        raw_items.append((calculated_date, effective_days_before, task, category, priority, owner))
+        raw_items.append(
+            (calculated_date, effective_days_before, task, category, priority, owner, is_expedited)
+        )
 
     # Sort strictly by calculated_date ascending, then by effective_days_before descending
     raw_items.sort(key=lambda x: (x[0], -x[1]))
@@ -232,22 +260,25 @@ def generate_timeline(
     curr_date = today
     final_items: list[TimelineItem] = []
 
-    for calc_date, days_before, task, category, priority, owner in raw_items:
+    for calc_date, days_before, task, category, priority, owner, is_expedited in raw_items:
         if calc_date < curr_date:
             calc_date = curr_date
         if calc_date > event_date:
             calc_date = event_date
         curr_date = calc_date
 
-        phase_name = (
-            "Event Day"
-            if calc_date == event_date
-            else f"{(event_date - calc_date).days} days before"
-        )
+        days_remaining = (event_date - calc_date).days
+        if calc_date == event_date:
+            phase_name = "Event Day"
+        elif is_expedited:
+            phase_name = f"{days_remaining}d before (Expedited)"
+        else:
+            phase_name = f"{days_remaining} days before"
+
         final_items.append(
             TimelineItem(
                 phase=phase_name,
-                days_before_event=(event_date - calc_date).days,
+                days_before_event=days_remaining,
                 target_date=calc_date,
                 task=task,
                 category=category,

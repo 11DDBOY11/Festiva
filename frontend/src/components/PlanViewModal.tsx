@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  AlertTriangle,
   Calendar,
   Clock,
   DollarSign,
@@ -109,6 +110,21 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
             <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
               {plan.summary}
             </p>
+          )}
+
+          {/* Compressed Timeline Warning */}
+          {plan.meta?.compressed_timeline && (
+            <div className="mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs sm:text-sm">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold block">Compressed Timeline Advisory</span>
+                <span className="text-xs">
+                  {typeof plan.meta.timeline_warning === "string"
+                    ? plan.meta.timeline_warning
+                    : "This celebration is scheduled on short notice. Standard planning lead times have been expedited. Confirm venue and priority vendors immediately."}
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Menu / Regional Ideas Pill */}
@@ -242,6 +258,19 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
           {/* TAB 2: TIMELINE & TASKS */}
           {activeTab === "timeline" && (
             <div className="space-y-3">
+              {plan.meta?.compressed_timeline && (
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs sm:text-sm">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold block">Compressed Timeline Schedule</span>
+                    <span className="text-xs">
+                      {typeof plan.meta.timeline_warning === "string"
+                        ? plan.meta.timeline_warning
+                        : "Milestones have been compressed to fit the short preparation window."}
+                    </span>
+                  </div>
+                </div>
+              )}
               {plan.timeline?.map((item, idx) => (
                 <div
                   key={idx}

@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.ai.llm_client import LLMClient, get_llm_client
+from app.ai.llm_client import FakeLLMClient, LLMClient, get_llm_client
 from app.domain.schemas import EventBrief
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,7 @@ def _heuristic_parse_fallback(raw_text: str) -> EventBrief:
 def parse_brief(
     raw_text: str,
     client: LLMClient | None = None,
+    allow_fallback: bool = True,
     **kwargs: Any,
 ) -> BriefParseResponse:
     """Parse unstructured text into an EventBrief with clarifying questions."""
@@ -163,6 +164,8 @@ def parse_brief(
         raise ValueError("Brief text cannot be empty.")
 
     llm = client or get_llm_client()
+    if not allow_fallback and isinstance(llm, FakeLLMClient):
+        raise RuntimeError("Live mode cannot use FakeLLMClient. A live GroqLLMClient is required.")
 
     try:
         parsed_brief = llm.generate_structured(
@@ -172,6 +175,9 @@ def parse_brief(
             **kwargs,
         )
     except Exception as exc:
+        if not allow_fallback:
+            logger.error("Live LLM brief parsing failed and fallback is disabled: %s", exc)
+            raise RuntimeError(f"Live LLM brief parsing failed: {exc}") from exc
         logger.warning(
             f"Structured LLM brief generation failed or unavailable ({exc}); using fallback."
         )

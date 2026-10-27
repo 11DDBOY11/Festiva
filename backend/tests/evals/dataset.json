@@ -176,5 +176,17 @@
       "needs_clarification": true,
       "expected_missing": ["event_date"]
     }
+  },
+  {
+    "id": "brief_16",
+    "name": "Compressed Timeline: Event 10 Days Away",
+    "raw_text": "Need to organize an intimate silver jubilee anniversary dinner for 50 people in 10 days in Mangaluru with a budget of 1.5 lakh. Vegetarian catering only.",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 50,
+      "total_budget": 150000.0,
+      "city": "Mangaluru",
+      "needs_clarification": false
+    }
   }
 ]

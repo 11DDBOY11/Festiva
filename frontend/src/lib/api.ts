@@ -333,6 +333,8 @@ export interface PlanSchema {
     menu_ideas?: string[];
     dietary_preferences?: string[];
     priorities?: string[];
+    compressed_timeline?: boolean;
+    timeline_warning?: string;
   };
 }
 
