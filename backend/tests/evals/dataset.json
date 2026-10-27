@@ -117,5 +117,64 @@
       "event_date": "2026-12-24",
       "needs_clarification": false
     }
+  },
+  {
+    "id": "brief_11",
+    "name": "Adversarial A: Vague Date & Guest Range",
+    "raw_text": "Need a function for my daughter's engagement sometime in Jan, maybe 150-200 people, budget around 5 lakh, veg only",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 200,
+      "total_budget": 500000.0,
+      "needs_clarification": true,
+      "expected_missing": ["event_date"]
+    }
+  },
+  {
+    "id": "brief_12",
+    "name": "Adversarial B: Rush Event Tomorrow",
+    "raw_text": "Plan birthday for 30 people tomorrow, budget 2 lakh",
+    "expected": {
+      "event_type": "birthday",
+      "guest_count": 30,
+      "total_budget": 200000.0,
+      "needs_clarification": true
+    }
+  },
+  {
+    "id": "brief_13",
+    "name": "Adversarial C: Kannada-English Code Mixing",
+    "raw_text": "Wedding ge 300 jana, Mangaluru, 12 Dec, 4 lakh, Udupi style saaru oota",
+    "expected": {
+      "event_type": "wedding",
+      "guest_count": 300,
+      "total_budget": 400000.0,
+      "city": "Mangaluru",
+      "needs_clarification": true
+    }
+  },
+  {
+    "id": "brief_14",
+    "name": "Adversarial D: Infeasible College Fest Budget",
+    "raw_text": "College fest for 2000 students, 50k budget, Mangaluru, March 14",
+    "expected": {
+      "event_type": "community",
+      "guest_count": 2000,
+      "total_budget": 50000.0,
+      "city": "Mangaluru",
+      "needs_clarification": true
+    }
+  },
+  {
+    "id": "brief_15",
+    "name": "Adversarial E: Event Date in Past",
+    "raw_text": "My mom's 60th birthday on 3 March 2025, 80 guests, ₹1 lakh",
+    "expected": {
+      "event_type": "birthday",
+      "guest_count": 80,
+      "total_budget": 100000.0,
+      "needs_clarification": true,
+      "expected_missing": ["event_date"]
+    }
   }
 ]

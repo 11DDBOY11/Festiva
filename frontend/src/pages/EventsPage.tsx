@@ -261,7 +261,7 @@ export const EventsPage: React.FC = () => {
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-white">0</div>
           <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Task tracker unlocks in Phase 9
+            Coming soon
           </div>
         </div>
       </div>
@@ -371,11 +371,10 @@ export const EventsPage: React.FC = () => {
                 <button
                   type="button"
                   disabled={true}
-                  title="Coming soon in Phase 4"
+                  title="Coming soon"
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg cursor-not-allowed transition"
                 >
-                  <span>View Plan</span>
-                  <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">(Phase 4)</span>
+                  <span>View plan</span>
                 </button>
               </div>
             </div>

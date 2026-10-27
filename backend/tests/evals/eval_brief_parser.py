@@ -126,8 +126,8 @@ def run_evals(mode: str = "replay") -> int:
                 else:
                     clarification_correct = True
 
-            # If running live and recording, save output
-            if mode == "live" and schema_valid:
+            # If running live with real client and recording, save output
+            if mode == "live" and schema_valid and not isinstance(client, FakeLLMClient):
                 recordings[brief_id] = json.loads(brief.model_dump_json())
 
         except ValidationError as val_err:

@@ -8,8 +8,14 @@
     "total_budget": 1500000.0,
     "currency": "INR",
     "theme": "Traditional coastal floral",
-    "dietary_preferences": ["Traditional Mangalorean"],
-    "priorities": ["catering", "floral mandap", "candid photography"],
+    "dietary_preferences": [
+      "Traditional Mangalorean"
+    ],
+    "priorities": [
+      "catering",
+      "floral mandap",
+      "candid photography"
+    ],
     "constraints": [],
     "missing_fields": [],
     "clarifying_questions": []
@@ -23,11 +29,19 @@
     "total_budget": null,
     "currency": "INR",
     "theme": "Golden milestone dinner",
-    "dietary_preferences": ["Coastal appetizers"],
-    "priorities": ["custom cake"],
+    "dietary_preferences": [
+      "Coastal appetizers"
+    ],
+    "priorities": [
+      "custom cake"
+    ],
     "constraints": [],
-    "missing_fields": ["total_budget"],
-    "clarifying_questions": ["What is your estimated overall budget (in INR) for this celebration?"]
+    "missing_fields": [
+      "total_budget"
+    ],
+    "clarifying_questions": [
+      "What is your estimated overall budget (in INR) for this celebration?"
+    ]
   },
   "brief_03": {
     "title": "Annual Tuluva Cultural Samithi Evening",
@@ -39,10 +53,19 @@
     "currency": "INR",
     "theme": "Traditional Tuluva cultural heritage",
     "dietary_preferences": [],
-    "priorities": ["stage setup", "pro sound"],
-    "constraints": ["community hall"],
-    "missing_fields": ["event_date"],
-    "clarifying_questions": ["Do you have a specific date or target month in mind?"]
+    "priorities": [
+      "stage setup",
+      "pro sound"
+    ],
+    "constraints": [
+      "community hall"
+    ],
+    "missing_fields": [
+      "event_date"
+    ],
+    "clarifying_questions": [
+      "Do you have a specific date or target month in mind?"
+    ]
   },
   "brief_04": {
     "title": "Destination Coastal Beach Wedding",
@@ -53,9 +76,16 @@
     "total_budget": 3500000.0,
     "currency": "INR",
     "theme": "Luxury beachside seaside sunset",
-    "dietary_preferences": ["Live seafood and vegetarian counters"],
-    "priorities": ["seaside decor", "drone cinematography"],
-    "constraints": ["outdoor beach contingency"],
+    "dietary_preferences": [
+      "Live seafood and vegetarian counters"
+    ],
+    "priorities": [
+      "seaside decor",
+      "drone cinematography"
+    ],
+    "constraints": [
+      "outdoor beach contingency"
+    ],
     "missing_fields": [],
     "clarifying_questions": []
   },
@@ -69,10 +99,17 @@
     "currency": "INR",
     "theme": "Jungle Safari",
     "dietary_preferences": [],
-    "priorities": ["balloon arch", "kids entertainment"],
+    "priorities": [
+      "balloon arch",
+      "kids entertainment"
+    ],
     "constraints": [],
-    "missing_fields": ["event_date"],
-    "clarifying_questions": ["Do you have a specific date or target month in mind?"]
+    "missing_fields": [
+      "event_date"
+    ],
+    "clarifying_questions": [
+      "Do you have a specific date or target month in mind?"
+    ]
   },
   "brief_06": {
     "title": "Mangaluru Birthday Gathering",
@@ -86,7 +123,11 @@
     "dietary_preferences": [],
     "priorities": [],
     "constraints": [],
-    "missing_fields": ["guest_count", "total_budget", "event_date"],
+    "missing_fields": [
+      "guest_count",
+      "total_budget",
+      "event_date"
+    ],
     "clarifying_questions": [
       "Approximately how many guests are you expecting to host?",
       "What is your estimated overall budget (in INR) for this celebration?",
@@ -102,9 +143,15 @@
     "total_budget": 400000.0,
     "currency": "INR",
     "theme": "Temple sacred prasadam meal",
-    "dietary_preferences": ["Pure veg traditional banana leaf meal"],
-    "priorities": ["authentic brahmin catering"],
-    "constraints": ["high capacity dining hall"],
+    "dietary_preferences": [
+      "Pure veg traditional banana leaf meal"
+    ],
+    "priorities": [
+      "authentic brahmin catering"
+    ],
+    "constraints": [
+      "high capacity dining hall"
+    ],
     "missing_fields": [],
     "clarifying_questions": []
   },
@@ -117,8 +164,12 @@
     "total_budget": 600000.0,
     "currency": "INR",
     "theme": "Elegant cozy reception",
-    "dietary_preferences": ["Buffet catering"],
-    "priorities": ["acoustic live music"],
+    "dietary_preferences": [
+      "Buffet catering"
+    ],
+    "priorities": [
+      "acoustic live music"
+    ],
     "constraints": [],
     "missing_fields": [],
     "clarifying_questions": []
@@ -132,11 +183,19 @@
     "total_budget": 350000.0,
     "currency": "INR",
     "theme": "Silver jubilee cocktail gala",
-    "dietary_preferences": ["Cocktail starters"],
-    "priorities": ["live band"],
+    "dietary_preferences": [
+      "Cocktail starters"
+    ],
+    "priorities": [
+      "live band"
+    ],
     "constraints": [],
-    "missing_fields": ["guest_count"],
-    "clarifying_questions": ["Approximately how many guests are you expecting to host?"]
+    "missing_fields": [
+      "guest_count"
+    ],
+    "clarifying_questions": [
+      "Approximately how many guests are you expecting to host?"
+    ]
   },
   "brief_10": {
     "title": "Kottara Youth Sports & Yakshagana Meet",
@@ -148,9 +207,115 @@
     "currency": "INR",
     "theme": "Community sports & classical Yakshagana",
     "dietary_preferences": [],
-    "priorities": ["ground sound setup", "stage lights"],
-    "constraints": ["open ground"],
+    "priorities": [
+      "ground sound setup",
+      "stage lights"
+    ],
+    "constraints": [
+      "open ground"
+    ],
     "missing_fields": [],
     "clarifying_questions": []
+  },
+  "brief_11": {
+    "title": "Daughter's Engagement Ceremony",
+    "event_type": "wedding",
+    "event_date": null,
+    "city": "Mangaluru",
+    "guest_count": 200,
+    "total_budget": 500000.0,
+    "currency": "INR",
+    "theme": "Traditional engagement",
+    "dietary_preferences": [
+      "veg only"
+    ],
+    "priorities": [],
+    "constraints": [],
+    "missing_fields": [
+      "event_date"
+    ],
+    "clarifying_questions": [
+      "Do you have a specific date in January in mind?",
+      "You mentioned a range of 150\u2013200 guests. We have budgeted for 200. Please confirm the final expected head count."
+    ]
+  },
+  "brief_12": {
+    "title": "Urgent Birthday Celebration",
+    "event_type": "birthday",
+    "event_date": "2026-10-28",
+    "city": "Mangaluru",
+    "guest_count": 30,
+    "total_budget": 200000.0,
+    "currency": "INR",
+    "theme": "Intimate Birthday Gathering",
+    "dietary_preferences": [],
+    "priorities": [],
+    "constraints": [
+      "urgent",
+      "short notice"
+    ],
+    "missing_fields": [],
+    "clarifying_questions": [
+      "Urgent Notice: The event is on 2026-10-28 (very short notice). Immediate vendor confirmation is required. Please confirm if this date is locked."
+    ]
+  },
+  "brief_13": {
+    "title": "Traditional Udupi Style Wedding",
+    "event_type": "wedding",
+    "event_date": "2026-12-12",
+    "city": "Mangaluru",
+    "guest_count": 300,
+    "total_budget": 400000.0,
+    "currency": "INR",
+    "theme": "Traditional Udupi Style",
+    "dietary_preferences": [
+      "Udupi style saaru oota"
+    ],
+    "priorities": [
+      "authentic catering"
+    ],
+    "constraints": [],
+    "missing_fields": [],
+    "clarifying_questions": [
+      "Budget Advisory: \u20b9400,000 for 300 wedding guests (\u20b91,333/person) is tight for Mangalorean venue, catering, and decor. Do you wish to prioritize economy?"
+    ]
+  },
+  "brief_14": {
+    "title": "College Youth Festival",
+    "event_type": "community",
+    "event_date": "2027-03-14",
+    "city": "Mangaluru",
+    "guest_count": 2000,
+    "total_budget": 50000.0,
+    "currency": "INR",
+    "theme": "College Youth Festival",
+    "dietary_preferences": [],
+    "priorities": [],
+    "constraints": [],
+    "missing_fields": [
+      "total_budget"
+    ],
+    "clarifying_questions": [
+      "Feasibility Alert: \u20b950,000 for 2000 attendees (\u20b925/person) is below viable venue and PA costs in Mangaluru. Can the budget or attendee count be adjusted?"
+    ]
+  },
+  "brief_15": {
+    "title": "Mom's 60th Birthday Celebration",
+    "event_type": "birthday",
+    "event_date": "2025-03-03",
+    "city": "Mangaluru",
+    "guest_count": 80,
+    "total_budget": 100000.0,
+    "currency": "INR",
+    "theme": "60th Birthday Milestone",
+    "dietary_preferences": [],
+    "priorities": [],
+    "constraints": [],
+    "missing_fields": [
+      "event_date"
+    ],
+    "clarifying_questions": [
+      "Date Advisory: The requested date (2025-03-03) is in the past. Please confirm the intended future date or year."
+    ]
   }
 }
