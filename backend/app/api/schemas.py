@@ -3,6 +3,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -80,5 +81,17 @@ class EventResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PlanVersionResponse(BaseModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    version: int
+    created_by: str
+    change_summary: str | None
+    created_at: datetime
+    plan: dict[str, Any]
 
     model_config = {"from_attributes": True}

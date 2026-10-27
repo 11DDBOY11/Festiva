@@ -255,3 +255,107 @@ export async function parseBrief(rawText: string): Promise<BriefParseResponse> {
   }
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Plan Version API Endpoints & Types
+// ---------------------------------------------------------------------------
+
+export interface BudgetCategoryAllocation {
+  category: string;
+  share_pct: number;
+  allocated_amount: number;
+  per_guest_cost?: number | null;
+  notes?: string;
+}
+
+export interface BudgetBreakdown {
+  total_budget: number;
+  currency: string;
+  categories: BudgetCategoryAllocation[];
+}
+
+export interface TimelineItem {
+  phase: string;
+  days_before_event: number;
+  target_date: string | null;
+  task: string;
+  category: string;
+  owner: string;
+  priority: "high" | "medium" | "low";
+}
+
+export interface ChecklistQuestion {
+  category: string;
+  item: string;
+  questions_to_ask_vendor: string[];
+  due_phase: string;
+}
+
+export interface RunOfShowSlot {
+  time_slot: string;
+  activity: string;
+  location: string;
+  lead_person: string;
+  notes: string;
+}
+
+export interface VendorRecommendation {
+  category: string;
+  vendor_id?: string | null;
+  vendor_name: string;
+  estimated_price_low?: number | null;
+  estimated_price_high?: number | null;
+  price_unit?: string | null;
+  is_grounded: boolean;
+  price_status: "confirmed" | "to confirm";
+  questions_to_ask: string[];
+  budget_impact: number;
+  reason: string;
+}
+
+export interface PlanSchema {
+  version: number;
+  title: string;
+  event_type: "wedding" | "birthday" | "community";
+  event_date: string | null;
+  guest_count: number | null;
+  total_budget: number;
+  currency: string;
+  summary: string;
+  budget: BudgetBreakdown;
+  timeline: TimelineItem[];
+  checklist: ChecklistQuestion[];
+  run_of_show: RunOfShowSlot[];
+  vendor_shortlist: VendorRecommendation[];
+  meta: {
+    city?: string;
+    theme?: string;
+    menu_ideas?: string[];
+    dietary_preferences?: string[];
+    priorities?: string[];
+  };
+}
+
+export interface PlanVersionResponse {
+  id: string;
+  event_id: string;
+  version: number;
+  created_by: string;
+  change_summary: string | null;
+  created_at: string;
+  plan: PlanSchema;
+}
+
+export async function getEventPlan(
+  eventId: string,
+  version?: number
+): Promise<PlanVersionResponse> {
+  const query = version ? `?version=${version}` : "";
+  const res = await fetchWithAuth(`/events/${eventId}/plan${query}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to load event plan");
+  }
+  return res.json();
+}
+

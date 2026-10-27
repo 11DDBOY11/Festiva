@@ -25,38 +25,47 @@ A budget-aware, RAG-powered celebration and event planning copilot for Mangaluru
    docker compose up -d
    ```
 
-3. Install backend dependencies:
+3. Create virtual environment & install backend dependencies:
 
+   **Windows (PowerShell / CMD):**
+   ```powershell
+   python -m venv backend/.venv
+   .\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+   ```
+
+   **Linux / macOS:**
    ```bash
-   cd backend
-   pip install -r requirements.txt
+   python3 -m venv backend/.venv
+   ./backend/.venv/bin/pip install -r backend/requirements.txt
    ```
 
 4. Run database migrations:
 
    ```bash
-   make migrate
+   make migrate        # Or .\make.bat migrate / .\make.ps1 migrate
    ```
 
 5. Start the API server:
 
    ```bash
-   cd backend
-   uvicorn app.main:app --reload
+   make dev            # Or .\make.bat dev / .\make.ps1 dev
    ```
 
 6. Open http://localhost:8000/docs for interactive API docs.
 
 ## Commands
 
-| Command       | Description                        |
-| ------------- | ---------------------------------- |
-| `make dev`    | Start infra + API server           |
-| `make test`   | Run pytest                         |
-| `make lint`   | Run Ruff linter                    |
-| `make migrate`| Apply Alembic migrations           |
-| `make demo`   | Run the demo script (Phase 6)      |
-| `make eval`   | Run the eval harness (Phase 3/6)   |
+All commands automatically utilize the local `backend/.venv` environment across platforms:
+
+| Command | Windows (CMD/PowerShell) | Description |
+| :--- | :--- | :--- |
+| `make test` | `.\make.bat test` or `.\make.ps1 test` | Run pytest suite (all 37 unit & integrity tests) |
+| `make lint` | `.\make.bat lint` or `.\make.ps1 lint` | Run Ruff linter across app/ and tests/ |
+| `make format` | `.\make.bat format` or `.\make.ps1 format` | Run Ruff auto-formatter |
+| `make eval` | `.\make.bat eval` or `.\make.ps1 eval` | Run Phase 3 Brief Parser & Phase 4 Plan Evals (replay mode) |
+| `make eval-live` | `.\make.bat eval-live` or `.\make.ps1 eval-live` | Run evaluation harness in live LLM provider mode |
+| `make migrate` | `.\make.bat migrate` or `.\make.ps1 migrate` | Apply Alembic migrations to current database |
+| `make dev` | `.\make.bat dev` or `.\make.ps1 dev` | Launch local Uvicorn dev server on port 8000 |
 
 ## Implementation Roadmap (12 Phases)
 

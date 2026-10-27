@@ -169,8 +169,7 @@ def run_evals(mode: str = "replay") -> int:
     print("PHASE 3 EVALUATION SUMMARY METRICS:")
     print(f"  • Total Briefs Tested:         {total_briefs}")
     print(
-        f"  • Valid Schema Rate:           {schema_pct:.1f}% "
-        f"({total_valid_schema}/{total_briefs})"
+        f"  • Valid Schema Rate:           {schema_pct:.1f}% ({total_valid_schema}/{total_briefs})"
     )
     print(
         f"  • Repair-Free Parsing Rate:    {repair_free_pct:.1f}% "

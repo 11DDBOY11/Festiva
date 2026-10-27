@@ -13,16 +13,20 @@ import {
   Wand2,
   Clock,
   CheckSquare,
+  Loader2,
 } from "lucide-react";
 import {
   EventItem,
   EventBrief,
   BriefParseResponse,
+  PlanSchema,
   createEvent,
   deleteEvent,
+  getEventPlan,
   listEvents,
   parseBrief,
 } from "../lib/api";
+import { PlanViewModal } from "../components/PlanViewModal";
 
 export const EventsPage: React.FC = () => {
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -47,7 +51,23 @@ export const EventsPage: React.FC = () => {
   const [newGuestCount, setNewGuestCount] = useState<string>("150");
   const [newTotalBudget, setNewTotalBudget] = useState<string>("500000");
 
+  // Plan View State
+  const [selectedPlan, setSelectedPlan] = useState<PlanSchema | null>(null);
+  const [loadingPlanEventId, setLoadingPlanEventId] = useState<string | null>(null);
+
   const isDev = import.meta.env.DEV || import.meta.env.VITE_ENV === "dev";
+
+  const handleViewPlan = async (eventId: string) => {
+    try {
+      setLoadingPlanEventId(eventId);
+      const res = await getEventPlan(eventId);
+      setSelectedPlan(res.plan);
+    } catch (err: any) {
+      setError(err.message || "Failed to load event plan");
+    } finally {
+      setLoadingPlanEventId(null);
+    }
+  };
 
   const loadEvents = async () => {
     try {
@@ -367,14 +387,21 @@ export const EventsPage: React.FC = () => {
                   <Trash2 className="w-4 h-4" />
                 </button>
 
-                {/* View Plan disabled with tooltip until Phase 4 */}
+                {/* View Plan enabled in Phase 4 */}
                 <button
                   type="button"
-                  disabled={true}
-                  title="Coming soon"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg cursor-not-allowed transition"
+                  onClick={() => handleViewPlan(event.id)}
+                  disabled={loadingPlanEventId === event.id}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 px-3 py-1.5 rounded-lg transition"
                 >
-                  <span>View plan</span>
+                  {loadingPlanEventId === event.id ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <span>View plan</span>
+                  )}
                 </button>
               </div>
             </div>
@@ -610,6 +637,11 @@ export const EventsPage: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Full Plan View Modal */}
+      {selectedPlan && (
+        <PlanViewModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} />
       )}
     </div>
   );

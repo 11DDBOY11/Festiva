@@ -198,9 +198,7 @@ def parse_brief(
         if "total_budget" not in missing:
             missing.append("total_budget")
         if not any("budget" in q.lower() or "spend" in q.lower() for q in questions):
-            questions.append(
-                "What is your estimated overall budget (in INR) for this celebration?"
-            )
+            questions.append("What is your estimated overall budget (in INR) for this celebration?")
 
     if parsed_brief.event_date is None:
         if "event_date" not in missing:

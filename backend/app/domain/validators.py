@@ -28,9 +28,7 @@ def validate_plan_budget(plan: PlanSchema, tolerance_pct: float = 1.0) -> tuple[
     return True, "Budget integrity verified."
 
 
-def validate_plan_dates(
-    plan: PlanSchema, reference_today: date | None = None
-) -> tuple[bool, str]:
+def validate_plan_dates(plan: PlanSchema, reference_today: date | None = None) -> tuple[bool, str]:
     """Validate that timeline dates fall between today and event date in chronological order."""
     if not plan.event_date:
         return True, "No event date specified to check."
