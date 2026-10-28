@@ -59,3 +59,6 @@ jobs:
       - name: Run Phase 5 Plan Diff Evals
         run: python tests/evals/eval_plan_diff.py --replay
 
+      - name: Run Benchmark Metrics Evaluation
+        run: python tests/evals/run_metrics.py --replay
+
