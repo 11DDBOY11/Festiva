@@ -8,6 +8,7 @@ import json
 import logging
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -50,6 +51,16 @@ class LLMClient(ABC):
         **kwargs: Any,
     ) -> T:
         """Generate structured output validated against a Pydantic model."""
+        pass
+
+    @abstractmethod
+    def stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> Iterator[str]:
+        """Stream generated text chunks."""
         pass
 
 
@@ -106,6 +117,42 @@ class FakeLLMClient(LLMClient):
             raise ValueError(
                 f"FakeLLMClient has no pre-configured response for model {response_model.__name__}"
             )
+
+    def stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> Iterator[str]:
+        self.call_history.append(
+            {
+                "type": "stream",
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "kwargs": kwargs,
+            }
+        )
+        words = [
+            "Festiva ",
+            "Copilot: ",
+            "I'm ",
+            "ready ",
+            "to ",
+            "help ",
+            "refine ",
+            "your ",
+            "celebration ",
+            "plan. ",
+            "You ",
+            "can ",
+            "adjust ",
+            "budgets, ",
+            "menus, ",
+            "or ",
+            "vendor ",
+            "preferences.",
+        ]
+        yield from words
 
 
 class GroqLLMClient(LLMClient):
@@ -222,6 +269,28 @@ class GroqLLMClient(LLMClient):
             )
             repaired_text = _clean_json_markdown(repair_resp.choices[0].message.content or "")
             return response_model.model_validate_json(repaired_text)
+
+    def stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> Iterator[str]:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        stream_res = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=kwargs.get("temperature", 0.3),
+            stream=True,
+        )
+        for chunk in stream_res:
+            content = chunk.choices[0].delta.content or ""
+            if content:
+                yield content
 
 
 def get_llm_client(provider: str | None = None) -> LLMClient:

@@ -53,6 +53,7 @@ export const EventsPage: React.FC = () => {
 
   // Plan View State
   const [selectedPlan, setSelectedPlan] = useState<PlanSchema | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loadingPlanEventId, setLoadingPlanEventId] = useState<string | null>(null);
 
   const isDev = import.meta.env.DEV || import.meta.env.VITE_ENV === "dev";
@@ -60,6 +61,7 @@ export const EventsPage: React.FC = () => {
   const handleViewPlan = async (eventId: string) => {
     try {
       setLoadingPlanEventId(eventId);
+      setSelectedEventId(eventId);
       const res = await getEventPlan(eventId);
       setSelectedPlan(res.plan);
     } catch (err: any) {
@@ -389,6 +391,7 @@ export const EventsPage: React.FC = () => {
 
                 {/* View Plan enabled in Phase 4 */}
                 <button
+                  id="btn-view-plan"
                   type="button"
                   onClick={() => handleViewPlan(event.id)}
                   disabled={loadingPlanEventId === event.id}
@@ -639,9 +642,17 @@ export const EventsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Full Plan View Modal */}
+      {/* Full Plan View Modal with Phase 5 Refinement & Diff Viewer */}
       {selectedPlan && (
-        <PlanViewModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} />
+        <PlanViewModal
+          plan={selectedPlan}
+          eventId={selectedEventId || undefined}
+          onClose={() => {
+            setSelectedPlan(null);
+            setSelectedEventId(null);
+          }}
+          onPlanUpdated={loadEvents}
+        />
       )}
     </div>
   );

@@ -1,15 +1,29 @@
+import json
 import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.llm_client import get_llm_client
 from app.api.deps import get_current_user
-from app.api.schemas import EventCreate, EventResponse, EventUpdate, PlanVersionResponse
-from app.db.models import Event, PlanVersion, User
+from app.api.schemas import (
+    ChatRequest,
+    EventCreate,
+    EventResponse,
+    EventUpdate,
+    PlanVersionResponse,
+    PlanVersionSummary,
+    ProposeChangeRequest,
+    ProposedChangeResponse,
+)
+from app.db.models import Event, PlanVersion, ProposedChange, User
 from app.db.session import get_db
+from app.domain.diff_engine import PlanDiff, apply_plan_diff, generate_plan_diff
 from app.domain.plan_generator import generate_plan
+from app.domain.schemas import PlanSchema
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +62,7 @@ def create_event(
         event.current_version = 1
         event.status = "draft"
     except Exception as exc:
-        logger.warning(f"Plan Version 1 auto-generation failed ({exc}); event saved as draft.")
+        logger.warning("Plan Version 1 auto-generation failed (%s); event saved as draft.", exc)
         event.current_version = None
 
     db.commit()
@@ -120,6 +134,46 @@ def delete_event(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     db.delete(event)
     db.commit()
+
+
+@router.get("/{event_id}/versions", response_model=list[PlanVersionSummary])
+def list_plan_versions(
+    event_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[PlanVersionSummary]:
+    """List summary metadata for all plan versions belonging to this event."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    versions = (
+        db.execute(
+            select(PlanVersion)
+            .where(PlanVersion.event_id == event_id)
+            .order_by(PlanVersion.version.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+    summaries = []
+    for v in versions:
+        tot_budget = None
+        if isinstance(v.plan, dict) and "total_budget" in v.plan:
+            tot_budget = v.plan["total_budget"]
+        summaries.append(
+            PlanVersionSummary(
+                version=v.version,
+                created_by=v.created_by,
+                change_summary=v.change_summary,
+                created_at=v.created_at,
+                total_budget=tot_budget,
+            )
+        )
+    return summaries
 
 
 @router.get("/{event_id}/plan", response_model=PlanVersionResponse)
@@ -207,3 +261,264 @@ def generate_new_plan_version(
     db.refresh(new_plan_version)
 
     return new_plan_version
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: Refinement, Diff Propose / Accept / Reject, and Streaming Chat
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{event_id}/changes/propose", response_model=ProposedChangeResponse)
+def propose_plan_change(
+    event_id: UUID,
+    req: ProposeChangeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ProposedChange:
+    """Analyze change request, compute structured diff, and record proposed change.
+
+    Applies optimistic locking: if req.base_version differs from current_version,
+    rebases the request against current_version automatically once.
+    """
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    current_ver = event.current_version or 1
+    base_ver = req.base_version or current_ver
+
+    # Optimistic locking check with 1-shot rebase against current_version
+    if req.base_version is not None and req.base_version != current_ver:
+        logger.info(
+            "Optimistic locking base_version mismatch on event %s (client %s, current %s). "
+            "Rebasing against current_version %s.",
+            event_id,
+            req.base_version,
+            current_ver,
+            current_ver,
+        )
+        base_ver = current_ver
+
+    # Load base plan version
+    plan_ver = db.execute(
+        select(PlanVersion).where(PlanVersion.event_id == event_id, PlanVersion.version == base_ver)
+    ).scalar_one_or_none()
+    if not plan_ver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Base plan version {base_ver} not found for this event",
+        )
+
+    try:
+        base_plan_schema = PlanSchema.model_validate(plan_ver.plan)
+        diff = generate_plan_diff(base_plan=base_plan_schema, prompt=req.prompt)
+    except Exception as exc:
+        logger.error("Failed to compute plan diff: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    proposed_change = ProposedChange(
+        event_id=event.id,
+        base_version=base_ver,
+        diff=diff.model_dump(mode="json"),
+        budget_impact=diff.budget_impact,
+        status="pending",
+    )
+    db.add(proposed_change)
+    db.commit()
+    db.refresh(proposed_change)
+
+    return proposed_change
+
+
+@router.post("/{event_id}/changes/{change_id}/accept", response_model=PlanVersionResponse)
+def accept_plan_change(
+    event_id: UUID,
+    change_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> PlanVersion:
+    """Accept a proposed change, increment version to N+1, update event, and mark change applied."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    change = db.execute(
+        select(ProposedChange).where(
+            ProposedChange.id == change_id, ProposedChange.event_id == event_id
+        )
+    ).scalar_one_or_none()
+    if not change:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Proposed change not found"
+        )
+
+    if change.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Change is already {change.status}; only pending changes can be accepted",
+        )
+
+    # Optimistic locking validation on accept
+    current_ver = event.current_version or 1
+    base_ver = change.base_version
+
+    # If current_ver has advanced past change.base_version, attempt 1-shot rebase
+    if current_ver != change.base_version:
+        logger.info(
+            "Change base_version %s differs from current %s. Attempting 1-shot rebase.",
+            base_ver,
+            current_ver,
+        )
+        base_ver = current_ver
+
+    # Load base plan
+    plan_ver = db.execute(
+        select(PlanVersion).where(PlanVersion.event_id == event_id, PlanVersion.version == base_ver)
+    ).scalar_one_or_none()
+    if not plan_ver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Base plan version {base_ver} could not be loaded",
+        )
+
+    try:
+        base_plan = PlanSchema.model_validate(plan_ver.plan)
+        diff_model = PlanDiff.model_validate(change.diff)
+        new_plan = apply_plan_diff(base_plan=base_plan, diff=diff_model)
+    except Exception as exc:
+        logger.error("Failed to apply plan diff: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    next_version = current_ver + 1
+    new_plan.version = next_version
+
+    new_plan_version = PlanVersion(
+        event_id=event.id,
+        version=next_version,
+        plan=new_plan.model_dump(mode="json"),
+        created_by="user",
+        change_summary=change.diff.get("summary", "Refined plan via proposal"),
+    )
+    db.add(new_plan_version)
+
+    # Update event state
+    event.current_version = next_version
+    event.total_budget = new_plan.total_budget
+    event.status = "active"
+    change.status = "applied"
+
+    db.commit()
+    db.refresh(new_plan_version)
+    db.refresh(event)
+
+    return new_plan_version
+
+
+@router.post("/{event_id}/changes/{change_id}/reject")
+def reject_plan_change(
+    event_id: UUID,
+    change_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Reject a proposed change without modifying the current plan."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    change = db.execute(
+        select(ProposedChange).where(
+            ProposedChange.id == change_id, ProposedChange.event_id == event_id
+        )
+    ).scalar_one_or_none()
+    if not change:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Proposed change not found"
+        )
+
+    if change.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Change is already {change.status}; only pending changes can be rejected",
+        )
+
+    change.status = "rejected"
+    db.commit()
+
+    return {"status": "rejected", "change_id": str(change_id)}
+
+
+@router.post("/{event_id}/chat")
+def chat_event_plan(
+    event_id: UUID,
+    req: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Server-Sent Events streaming chat endpoint for interactive co-planning."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    current_ver = event.current_version or 1
+    plan_ver = db.execute(
+        select(PlanVersion).where(
+            PlanVersion.event_id == event_id, PlanVersion.version == current_ver
+        )
+    ).scalar_one_or_none()
+
+    plan_context = ""
+    if plan_ver and isinstance(plan_ver.plan, dict):
+        p_dict = plan_ver.plan
+        cats = [
+            f"{c.get('category')}: ₹{float(c.get('allocated_amount', 0)):,.0f}"
+            for c in p_dict.get("budget", {}).get("categories", [])
+        ]
+        plan_context = (
+            f"Event: {event.title} ({event.event_type})\n"
+            f"Version: v{plan_ver.version}\n"
+            f"Total Budget: INR {float(event.total_budget or p_dict.get('total_budget', 0)):,.0f}\n"
+            f"Guest Count: {event.guest_count or p_dict.get('guest_count')}\n"
+            f"Budget Breakdown: {', '.join(cats)}\n"
+            f"Plan Summary: {p_dict.get('summary', '')}\n"
+        )
+
+    system_prompt = (
+        "You are Festiva Copilot, a budget-aware, empathetic celebration planner in Mangaluru.\n"
+        "You help hosts co-plan weddings, birthdays, and community festivals within budget.\n"
+        f"Active Plan Details:\n{plan_context}\n"
+        "Guidelines:\n"
+        "1. Give concise, culturally resonant advice for Dakshina Kannada / Mangaluru.\n"
+        "2. If the user asks to adjust budget (e.g., 'reduce décor by ₹10,000' or 'add catering'), "
+        "explain the trade-offs and tell them they can preview the diff.\n"
+    )
+
+    llm = get_llm_client()
+
+    def generate_sse():
+        try:
+            for token in llm.stream(prompt=req.message, system_prompt=system_prompt):
+                payload = json.dumps({"content": token})
+                yield f"data: {payload}\n\n"
+        except Exception as stream_err:
+            logger.error("Chat streaming error: %s", stream_err)
+            yield f"data: {json.dumps({'error': str(stream_err)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate_sse(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

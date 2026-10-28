@@ -259,8 +259,7 @@ def run_evals(mode: str = "replay") -> int:
             f"({headline_correct_clarifications}/{headline_count})"
         )
         print(
-            f"  - Headline Overall Pass Rate:  {pass_pct:.1f}% "
-            f"({headline_passed}/{headline_count})"
+            f"  - Headline Overall Pass Rate:  {pass_pct:.1f}% ({headline_passed}/{headline_count})"
         )
     print("=" * 94 + "\n")
 

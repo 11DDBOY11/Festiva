@@ -361,3 +361,175 @@ export async function getEventPlan(
   return res.json();
 }
 
+export interface PlanVersionSummary {
+  id: string;
+  version: number;
+  created_by: string;
+  change_summary?: string | null;
+  created_at: string;
+  total_budget?: number | null;
+}
+
+export interface CategoryDelta {
+  category: string;
+  old_amount: number;
+  new_amount: number;
+  delta: number;
+  old_share_pct?: number | null;
+  new_share_pct?: number | null;
+}
+
+export interface TimelineDelta {
+  task: string;
+  action: string;
+  old_date?: string | null;
+  new_date?: string | null;
+  reason?: string | null;
+}
+
+export interface PlanDiff {
+  prompt: string;
+  summary: string;
+  category_changes: CategoryDelta[];
+  timeline_changes: TimelineDelta[];
+  old_total_budget: number;
+  new_total_budget: number;
+  budget_impact: number;
+}
+
+export interface ProposedChangeResponse {
+  id: string;
+  event_id: string;
+  base_version: number;
+  diff: PlanDiff;
+  budget_impact: number;
+  status: "pending" | "applied" | "rejected";
+  created_at: string;
+}
+
+export async function getPlanVersions(eventId: string): Promise<PlanVersionSummary[]> {
+  const res = await fetchWithAuth(`/events/${eventId}/versions`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to load plan versions");
+  }
+  return res.json();
+}
+
+export async function proposePlanChange(
+  eventId: string,
+  prompt: string,
+  baseVersion: number
+): Promise<ProposedChangeResponse> {
+  const res = await fetchWithAuth(`/events/${eventId}/changes/propose`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, base_version: baseVersion }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to propose plan change");
+  }
+  return res.json();
+}
+
+export async function acceptPlanChange(
+  eventId: string,
+  changeId: string,
+  baseVersion?: number
+): Promise<PlanVersionResponse> {
+  const res = await fetchWithAuth(`/events/${eventId}/changes/${changeId}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to accept plan change");
+  }
+  return res.json();
+}
+
+export async function rejectPlanChange(
+  eventId: string,
+  changeId: string
+): Promise<ProposedChangeResponse> {
+  const res = await fetchWithAuth(`/events/${eventId}/changes/${changeId}/reject`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to reject plan change");
+  }
+  return res.json();
+}
+
+export function streamPlanChat(
+  eventId: string,
+  message: string,
+  onChunk: (chunk: string) => void,
+  onDone: () => void,
+  onError: (err: Error) => void
+): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+
+  (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/events/${eventId}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Chat stream request failed");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("No readable stream response");
+      }
+
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.replace(/^data:\s*/, "");
+          if (payload === "[DONE]") {
+            onDone();
+            return;
+          }
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed.content) onChunk(parsed.content);
+          } catch {
+            if (payload) onChunk(payload);
+          }
+        }
+      }
+      onDone();
+    } catch (err: unknown) {
+      if ((err as Error)?.name !== "AbortError") {
+        onError(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  })();
+
+  return () => controller.abort();
+}
+

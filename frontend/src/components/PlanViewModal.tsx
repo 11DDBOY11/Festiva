@@ -1,26 +1,195 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
+  Building2,
   Calendar,
+  Check,
+  CheckCircle2,
   Clock,
   DollarSign,
+  ExternalLink,
   HelpCircle,
+  History,
+  Loader2,
+  MapPin,
+  Send,
+  Sliders,
   Sparkles,
   Store,
   Utensils,
   X,
+  XCircle,
 } from "lucide-react";
-import { PlanSchema } from "../lib/api";
+import {
+  acceptPlanChange,
+  getEventPlan,
+  getPlanVersions,
+  PlanSchema,
+  PlanVersionSummary,
+  proposePlanChange,
+  ProposedChangeResponse,
+  rejectPlanChange,
+  streamPlanChat,
+} from "../lib/api";
 
 interface PlanViewModalProps {
   plan: PlanSchema;
+  eventId?: string;
   onClose: () => void;
+  onPlanUpdated?: () => void;
 }
 
-export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) => {
-  const [activeTab, setActiveTab] = useState<"budget" | "timeline" | "run_of_show" | "vendors">(
-    "budget"
-  );
+export const PlanViewModal: React.FC<PlanViewModalProps> = ({
+  plan: initialPlan,
+  eventId,
+  onClose,
+  onPlanUpdated,
+}) => {
+  const [currentPlan, setCurrentPlan] = useState<PlanSchema>(initialPlan);
+  const [activeTab, setActiveTab] = useState<
+    "budget" | "timeline" | "run_of_show" | "vendors" | "refine"
+  >("budget");
+
+  // Versioning state
+  const [versions, setVersions] = useState<PlanVersionSummary[]>([]);
+  const [selectedVersionNum, setSelectedVersionNum] = useState<number>(initialPlan.version);
+  const [versionLoading, setVersionLoading] = useState(false);
+
+  // Proposal & Diff state
+  const [proposalPrompt, setProposalPrompt] = useState("");
+  const [proposing, setProposing] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [activeProposal, setActiveProposal] = useState<ProposedChangeResponse | null>(null);
+  const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [applyingChange, setApplyingChange] = useState(false);
+
+  // Streaming Chat state
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatHistory, setChatHistory] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
+    {
+      role: "assistant",
+      text: "Namaskara! I am your Festiva Copilot. You can ask me to adjust budget allocations (e.g. 'reduce décor by ₹10,000'), suggest Mangalorean menus, or refine timeline milestones.",
+    },
+  ]);
+  const [streamingChat, setStreamingChat] = useState(false);
+
+  // Load versions list
+  useEffect(() => {
+    if (!eventId) return;
+    getPlanVersions(eventId)
+      .then((data) => setVersions(data))
+      .catch((err) => console.error("Failed to load versions:", err));
+  }, [eventId, currentPlan.version]);
+
+  const handleSelectVersion = async (vNum: number) => {
+    if (!eventId || vNum === currentPlan.version) return;
+    setVersionLoading(true);
+    try {
+      const res = await getEventPlan(eventId, vNum);
+      setCurrentPlan(res.plan);
+      setSelectedVersionNum(vNum);
+    } catch (err: any) {
+      alert(err.message || "Failed to switch plan version");
+    } finally {
+      setVersionLoading(false);
+    }
+  };
+
+  const handleProposeChange = async (customPrompt?: string) => {
+    if (!eventId) return;
+    const promptToUse = (customPrompt || proposalPrompt).trim();
+    if (!promptToUse) return;
+
+    setProposing(true);
+    setProposalError(null);
+    setActionSuccessMessage(null);
+
+    try {
+      const res = await proposePlanChange(eventId, promptToUse, currentPlan.version);
+      setActiveProposal(res);
+      setProposalPrompt("");
+      setActiveTab("refine");
+    } catch (err: any) {
+      setProposalError(err.message || "Failed to compute modification diff.");
+    } finally {
+      setProposing(false);
+    }
+  };
+
+  const handleAcceptChange = async () => {
+    if (!eventId || !activeProposal) return;
+    setApplyingChange(true);
+    setProposalError(null);
+
+    try {
+      const updatedVersion = await acceptPlanChange(
+        eventId,
+        activeProposal.id,
+        currentPlan.version
+      );
+      setCurrentPlan(updatedVersion.plan);
+      setSelectedVersionNum(updatedVersion.version);
+      setActionSuccessMessage(
+        `Successfully applied change and generated Plan v${updatedVersion.version}!`
+      );
+      setActiveProposal(null);
+      if (onPlanUpdated) onPlanUpdated();
+    } catch (err: any) {
+      setProposalError(err.message || "Failed to apply proposed change.");
+    } finally {
+      setApplyingChange(false);
+    }
+  };
+
+  const handleRejectChange = async () => {
+    if (!eventId || !activeProposal) return;
+    try {
+      await rejectPlanChange(eventId, activeProposal.id);
+      setActiveProposal(null);
+      setActionSuccessMessage("Proposed changes were discarded. Plan remains unchanged.");
+    } catch (err: any) {
+      setProposalError(err.message || "Failed to reject change.");
+    }
+  };
+
+  const handleSendChatMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventId || !chatMessage.trim() || streamingChat) return;
+
+    const userText = chatMessage.trim();
+    setChatMessage("");
+    setChatHistory((prev) => [...prev, { role: "user", text: userText }]);
+
+    // Append placeholder for assistant response
+    setChatHistory((prev) => [...prev, { role: "assistant", text: "" }]);
+    setStreamingChat(true);
+
+    streamPlanChat(
+      eventId,
+      userText,
+      (chunk) => {
+        setChatHistory((prev) => {
+          const updated = [...prev];
+          const lastIdx = updated.length - 1;
+          if (lastIdx >= 0 && updated[lastIdx].role === "assistant") {
+            updated[lastIdx] = {
+              ...updated[lastIdx],
+              text: updated[lastIdx].text + chunk,
+            };
+          }
+          return updated;
+        });
+      },
+      () => {
+        setStreamingChat(false);
+      },
+      (err) => {
+        console.error("Stream error:", err);
+        setStreamingChat(false);
+      }
+    );
+  };
 
   const formatCurrency = (amt: number | null | undefined): string => {
     if (amt === null || amt === undefined) return "₹0";
@@ -40,212 +209,445 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
     });
   };
 
+  // Identify confirmed or recommended venue
+  const venueVendor = currentPlan.vendor_shortlist?.find(
+    (v) =>
+      v.category.toLowerCase().includes("venue") ||
+      v.vendor_name.toLowerCase().includes("hall") ||
+      v.vendor_name.toLowerCase().includes("centre") ||
+      v.vendor_name.toLowerCase().includes("lawn") ||
+      v.vendor_name.toLowerCase().includes("ballroom") ||
+      v.vendor_name.toLowerCase().includes("pavilion") ||
+      v.vendor_name.toLowerCase().includes("resort")
+  );
+
+  const rawVenueName =
+    venueVendor?.vendor_name ||
+    currentPlan.run_of_show?.[0]?.location ||
+    "Mangala Heritage Grand Convention Centre";
+  const displayVenueName = rawVenueName.replace(/^\[Sample\]\s*/i, "");
+  const venueLocation = "Mangaluru, Karnataka";
+  const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    `${displayVenueName}, ${venueLocation}`
+  )}`;
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Event Plan Modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-border bg-muted/40">
+        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                  Plan v{plan.version}
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium capitalize bg-secondary text-secondary-foreground">
-                  {plan.event_type}
-                </span>
-                {plan.guest_count && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                    {plan.guest_count} guests
+                {/* Version Selector Pill */}
+                {versions.length > 1 ? (
+                  <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-full px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    <History className="w-3.5 h-3.5" />
+                    <span>Plan:</span>
+                    <select
+                      value={selectedVersionNum}
+                      onChange={(e) => handleSelectVersion(Number(e.target.value))}
+                      className="bg-transparent text-amber-700 dark:text-amber-300 font-bold focus:outline-none cursor-pointer"
+                    >
+                      {versions.map((v) => (
+                        <option key={v.version} value={v.version} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                          v{v.version} {v.version === currentPlan.version ? "(Current)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    Plan v{currentPlan.version}
                   </span>
                 )}
-                {plan.event_date && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                    {formatDate(plan.event_date)}
+
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                  {currentPlan.event_type}
+                </span>
+                {currentPlan.guest_count && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300">
+                    {currentPlan.guest_count} guests
+                  </span>
+                )}
+                {currentPlan.event_date && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300">
+                    {formatDate(currentPlan.event_date)}
                   </span>
                 )}
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                {plan.title}
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                {currentPlan.title}
+                {versionLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-600" />}
               </h2>
             </div>
-            <button
-              onClick={onClose}
-              aria-label="Close modal"
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-header-suggest-changes"
+                type="button"
+                onClick={() => {
+                  setActiveTab("refine");
+                  setTimeout(() => {
+                    document.getElementById("input-propose-prompt")?.focus();
+                  }, 100);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 dark:text-amber-200 border border-amber-400/60 dark:border-amber-700 transition shadow-2xs cursor-pointer"
+                title="Suggest changes or modifications to AI"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Suggestions / Changes</span>
+              </button>
+              <button
+                id="btn-close-modal-x"
+                onClick={onClose}
+                aria-label="Close modal"
+                className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Top Metric Strip */}
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="p-3 rounded-xl bg-card border border-border">
-              <span className="text-xs font-medium text-muted-foreground">Total Planned Budget</span>
-              <div className="text-lg sm:text-xl font-bold text-primary mt-0.5">
-                {formatCurrency(plan.total_budget)}
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Budget</span>
+              <div className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                {formatCurrency(currentPlan.total_budget)}
               </div>
             </div>
-            <div className="p-3 rounded-xl bg-card border border-border">
-              <span className="text-xs font-medium text-muted-foreground">Budget Breakdown</span>
-              <div className="text-lg sm:text-xl font-bold text-foreground mt-0.5">
-                {plan.budget?.categories?.length || 0} Categories
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Budget Breakdown</span>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                {currentPlan.budget?.categories?.length || 0} Categories
               </div>
             </div>
-            <div className="col-span-2 sm:col-span-1 p-3 rounded-xl bg-card border border-border">
-              <span className="text-xs font-medium text-muted-foreground">Milestones</span>
-              <div className="text-lg sm:text-xl font-bold text-foreground mt-0.5">
-                {plan.timeline?.length || 0} Tasks
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Milestones</span>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                {currentPlan.timeline?.length || 0} Tasks
               </div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Plan Iterations</span>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                Version {currentPlan.version} of {Math.max(versions.length, currentPlan.version)}
+              </div>
+            </div>
+          </div>
+
+          {/* Dedicated Venue & Location Showcase Card */}
+          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-50 dark:to-slate-900/60 border-2 border-amber-400/80 dark:border-amber-600/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                    Event Venue • ಸ್ಥಳ (Location)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                    Confirmed Venue
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                  {displayVenueName}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-1 mt-0.5">
+                  <span className="font-medium">📍 {venueLocation}</span>
+                  {venueVendor?.price_low && (
+                    <span className="text-slate-500 dark:text-slate-400 font-mono ml-1">
+                      • Tier: {formatCurrency(venueVendor.price_low)} – {formatCurrency(venueVendor.price_high)}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 pt-1 md:pt-0">
+              <a
+                href={mapsSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 hover:border-amber-500 dark:hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-300 transition shadow-xs"
+                title="Open venue location in Google Maps"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>View on Google Maps</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("refine");
+                  setProposalPrompt("Change venue to an outdoor lawn or beachside hall in Mangaluru");
+                  setTimeout(() => {
+                    document.getElementById("input-propose-prompt")?.focus();
+                  }, 100);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-xs transition cursor-pointer"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Change Venue</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dedicated Venue & Location Showcase Card */}
+          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-50 dark:to-slate-900/60 border-2 border-amber-400/80 dark:border-amber-600/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                    Event Venue • ಸ್ಥಳ (Location)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                    Confirmed Venue
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                  {displayVenueName}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-1 mt-0.5">
+                  <span className="font-medium">📍 {venueLocation}</span>
+                  {venueVendor?.estimated_price_low && (
+                    <span className="text-slate-500 dark:text-slate-400 font-mono ml-1">
+                      • Tier: {formatCurrency(venueVendor.estimated_price_low)} – {formatCurrency(venueVendor.estimated_price_high)}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 pt-1 md:pt-0">
+              <a
+                href={mapsSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 hover:border-amber-500 dark:hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-300 transition shadow-xs"
+                title="Open venue location in Google Maps"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>View on Google Maps</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("refine");
+                  setProposalPrompt("Change venue to an outdoor lawn or beachside hall in Mangaluru");
+                  setTimeout(() => {
+                    document.getElementById("input-propose-prompt")?.focus();
+                  }, 100);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-xs transition cursor-pointer"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Change Venue</span>
+              </button>
             </div>
           </div>
 
           {/* Theme Concept & Summary */}
-          {plan.summary && (
-            <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              {plan.summary}
+          {currentPlan.summary && (
+            <p className="mt-3 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+              {currentPlan.summary}
             </p>
           )}
 
           {/* Compressed Timeline Warning */}
-          {plan.meta?.compressed_timeline && (
-            <div className="mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs sm:text-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          {currentPlan.meta?.compressed_timeline && (
+            <div className="mt-3 flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-100/90 dark:bg-amber-950/70 border-2 border-amber-400 dark:border-amber-600/80 text-amber-950 dark:text-amber-100 shadow-xs">
+              <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-300 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold block">Compressed Timeline Advisory</span>
-                <span className="text-xs">
-                  {typeof plan.meta.timeline_warning === "string"
-                    ? plan.meta.timeline_warning
+                <span className="font-bold block text-xs sm:text-sm text-amber-900 dark:text-amber-200">Compressed Timeline Advisory</span>
+                <span className="text-xs text-amber-950 dark:text-amber-100">
+                  {typeof currentPlan.meta.timeline_warning === "string"
+                    ? currentPlan.meta.timeline_warning
                     : "This celebration is scheduled on short notice. Standard planning lead times have been expedited. Confirm venue and priority vendors immediately."}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Menu / Regional Ideas Pill */}
-          {plan.meta?.menu_ideas && plan.meta.menu_ideas.length > 0 && (
-            <div className="mt-3 flex items-center gap-2 overflow-x-auto text-xs text-muted-foreground py-1">
-              <Utensils className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-              <span className="font-semibold text-foreground flex-shrink-0">Curated Menu:</span>
-              <div className="flex items-center gap-1.5 flex-nowrap">
-                {plan.meta.menu_ideas.map((dish, i) => (
-                  <span
-                    key={i}
-                    className="inline-block px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[11px] whitespace-nowrap"
-                  >
-                    {dish}
-                  </span>
-                ))}
+          {/* Menu / Regional Ideas Pill (Flex Wrap - No horizontal scrollbar) */}
+          {currentPlan.meta?.menu_ideas && currentPlan.meta.menu_ideas.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs py-1">
+              <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-bold mr-1">
+                <Utensils className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Curated Menu:</span>
               </div>
+              {currentPlan.meta.menu_ideas.map((dish, i) => (
+                <span
+                  key={i}
+                  className="inline-block px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-medium shadow-2xs"
+                >
+                  {dish}
+                </span>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-border bg-card px-4 sm:px-6 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab("budget")}
-            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "budget"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            Budget Table
-          </button>
-          <button
-            onClick={() => setActiveTab("timeline")}
-            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "timeline"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Timeline & Tasks ({plan.timeline?.length || 0})
-          </button>
-          <button
-            onClick={() => setActiveTab("run_of_show")}
-            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "run_of_show"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            Run-of-Show ({plan.run_of_show?.length || 0})
-          </button>
-          <button
-            onClick={() => setActiveTab("vendors")}
-            className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "vendors"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Store className="w-4 h-4" />
-            Vendors & Checklist
-          </button>
+        {/* Highlighted Segmented Navigation Bar */}
+        <div className="px-4 sm:px-6 py-3 bg-slate-100 dark:bg-slate-950/90 border-y-2 border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-200/90 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 shadow-inner overflow-x-auto">
+            <button
+              id="tab-btn-budget"
+              onClick={() => setActiveTab("budget")}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "budget"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-[1.02] border border-amber-500"
+                  : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800/80 border border-transparent"
+              }`}
+            >
+              <DollarSign className="w-4 h-4" />
+              <span>Budget Table</span>
+            </button>
+
+            <button
+              id="tab-btn-timeline"
+              onClick={() => setActiveTab("timeline")}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "timeline"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-[1.02] border border-amber-500"
+                  : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800/80 border border-transparent"
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Timeline & Tasks</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === "timeline"
+                    ? "bg-white/25 text-white"
+                    : "bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                {currentPlan.timeline?.length || 0}
+              </span>
+            </button>
+
+            <button
+              id="tab-btn-run-of-show"
+              onClick={() => setActiveTab("run_of_show")}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "run_of_show"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-[1.02] border border-amber-500"
+                  : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800/80 border border-transparent"
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              <span>Run-of-Show</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === "run_of_show"
+                    ? "bg-white/25 text-white"
+                    : "bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                {currentPlan.run_of_show?.length || 0}
+              </span>
+            </button>
+
+            <button
+              id="tab-btn-vendors"
+              onClick={() => setActiveTab("vendors")}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "vendors"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-[1.02] border border-amber-500"
+                  : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800/80 border border-transparent"
+              }`}
+            >
+              <Store className="w-4 h-4" />
+              <span>Vendors & Checklist</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === "vendors"
+                    ? "bg-white/25 text-white"
+                    : "bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                {currentPlan.vendor_shortlist?.length || 0}
+              </span>
+            </button>
+
+            <button
+              id="tab-btn-refine"
+              onClick={() => setActiveTab("refine")}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "refine"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-[1.02] border border-emerald-500"
+                  : "bg-amber-500/15 text-amber-900 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-400/60 dark:border-amber-700"
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>Suggestions / Changes</span>
+              {activeProposal && (
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Tab Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/60 dark:bg-slate-950/50">
           {/* TAB 1: BUDGET TABLE */}
           {activeTab === "budget" && (
             <div className="space-y-4">
-              <div className="overflow-x-auto rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
                 <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+                  <thead className="bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold">Category</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold text-right">Share (%)</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold text-right">Allocated Amount</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold text-right hidden sm:table-cell">
+                      <th className="py-3 px-3 sm:px-4 font-bold">Category</th>
+                      <th className="py-3 px-3 sm:px-4 font-bold text-right">Share (%)</th>
+                      <th className="py-3 px-3 sm:px-4 font-bold text-right">Allocated Amount</th>
+                      <th className="py-3 px-3 sm:px-4 font-bold text-right hidden sm:table-cell">
                         Per Guest
                       </th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold hidden md:table-cell">Notes</th>
+                      <th className="py-3 px-3 sm:px-4 font-bold hidden md:table-cell">Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
-                    {plan.budget?.categories?.map((cat, idx) => (
-                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-3 sm:px-4 font-medium text-foreground">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {currentPlan.budget?.categories?.map((cat, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="py-3 px-3 sm:px-4 font-bold text-slate-900 dark:text-white">
                           {cat.category}
                         </td>
-                        <td className="py-3 px-3 sm:px-4 text-right font-mono text-muted-foreground">
+                        <td className="py-3 px-3 sm:px-4 text-right font-mono text-slate-600 dark:text-slate-300 font-medium">
                           {Number(cat.share_pct).toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 sm:px-4 text-right font-bold text-foreground">
+                        <td className="py-3 px-3 sm:px-4 text-right font-bold text-slate-900 dark:text-white text-sm">
                           {formatCurrency(Number(cat.allocated_amount))}
                         </td>
-                        <td className="py-3 px-3 sm:px-4 text-right font-mono text-muted-foreground hidden sm:table-cell">
+                        <td className="py-3 px-3 sm:px-4 text-right font-mono text-slate-600 dark:text-slate-300 hidden sm:table-cell">
                           {cat.per_guest_cost ? formatCurrency(Number(cat.per_guest_cost)) : "—"}
                         </td>
-                        <td className="py-3 px-3 sm:px-4 text-xs text-muted-foreground hidden md:table-cell">
+                        <td className="py-3 px-3 sm:px-4 text-xs text-slate-600 dark:text-slate-400 hidden md:table-cell">
                           {cat.notes || "Standard tier allocation"}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-muted/50 font-bold border-t border-border">
+                  <tfoot className="bg-slate-100/90 dark:bg-slate-800/90 font-bold border-t-2 border-slate-200 dark:border-slate-700">
                     <tr>
-                      <td className="py-3 px-3 sm:px-4 text-foreground">Total Budget</td>
-                      <td className="py-3 px-3 sm:px-4 text-right text-muted-foreground">100.0%</td>
-                      <td className="py-3 px-3 sm:px-4 text-right text-primary text-base">
-                        {formatCurrency(plan.total_budget)}
+                      <td className="py-3.5 px-3 sm:px-4 text-slate-900 dark:text-white">Total Budget</td>
+                      <td className="py-3.5 px-3 sm:px-4 text-right text-slate-700 dark:text-slate-300">100.0%</td>
+                      <td className="py-3.5 px-3 sm:px-4 text-right text-amber-600 dark:text-amber-400 text-base font-bold">
+                        {formatCurrency(currentPlan.total_budget)}
                       </td>
-                      <td className="py-3 px-3 sm:px-4 text-right text-muted-foreground hidden sm:table-cell">
-                        {plan.guest_count && plan.total_budget
-                          ? formatCurrency(plan.total_budget / plan.guest_count)
+                      <td className="py-3.5 px-3 sm:px-4 text-right text-slate-700 dark:text-slate-300 hidden sm:table-cell font-mono">
+                        {currentPlan.guest_count && currentPlan.total_budget
+                          ? formatCurrency(currentPlan.total_budget / currentPlan.guest_count)
                           : "—"}
                       </td>
-                      <td className="py-3 px-3 sm:px-4 text-xs text-muted-foreground hidden md:table-cell">
+                      <td className="py-3.5 px-3 sm:px-4 text-xs text-slate-500 dark:text-slate-400 hidden md:table-cell font-normal">
                         Sum balanced within 1%
                       </td>
                     </tr>
@@ -258,56 +660,41 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
           {/* TAB 2: TIMELINE & TASKS */}
           {activeTab === "timeline" && (
             <div className="space-y-3">
-              {plan.meta?.compressed_timeline && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs sm:text-sm">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold block">Compressed Timeline Schedule</span>
-                    <span className="text-xs">
-                      {typeof plan.meta.timeline_warning === "string"
-                        ? plan.meta.timeline_warning
-                        : "Milestones have been compressed to fit the short preparation window."}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {plan.timeline?.map((item, idx) => (
+              {currentPlan.timeline?.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start justify-between gap-3 p-3.5 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors"
+                  className="flex items-start justify-between gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1.5 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
+                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                         {item.phase}
                       </span>
-                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground">
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         {item.category}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
                           item.priority === "high"
-                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                            : "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
                         }`}
                       >
                         {item.priority}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-foreground">{item.task}</p>
-                    <p className="text-xs text-muted-foreground">Owner: {item.owner}</p>
+                    <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">{item.task}</p>
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Owner: {item.owner}</p>
                   </div>
 
-                  {item.target_date && (
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-xs font-semibold text-foreground block">
-                        {formatDate(item.target_date)}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {item.days_before_event === 0 ? "Event Day" : `${item.days_before_event}d left`}
-                      </span>
-                    </div>
-                  )}
+                  <div className="text-right flex-shrink-0 pt-0.5">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block font-mono">
+                      {item.target_date ? formatDate(item.target_date) : "TBD"}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      T{item.days_before_event < 0 ? item.days_before_event : `-${item.days_before_event}`}d
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -316,87 +703,78 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
           {/* TAB 3: RUN OF SHOW */}
           {activeTab === "run_of_show" && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-border overflow-hidden">
-                <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-muted/50 text-muted-foreground border-b border-border">
-                    <tr>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold w-28 sm:w-36">Time Slot</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold">Activity</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold hidden sm:table-cell">Location</th>
-                      <th className="py-2.5 px-3 sm:px-4 font-semibold hidden md:table-cell">Lead Person</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {plan.run_of_show?.map((slot, idx) => (
-                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-3 sm:px-4 font-mono font-semibold text-primary">
-                          {slot.time_slot}
-                        </td>
-                        <td className="py-3 px-3 sm:px-4">
-                          <div className="font-medium text-foreground">{slot.activity}</div>
-                          {slot.notes && (
-                            <div className="text-xs text-muted-foreground mt-0.5">{slot.notes}</div>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 sm:px-4 text-muted-foreground hidden sm:table-cell">
-                          {slot.location}
-                        </td>
-                        <td className="py-3 px-3 sm:px-4 text-muted-foreground hidden md:table-cell">
-                          {slot.lead_person}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {currentPlan.run_of_show?.map((slot, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
+                >
+                  <div className="w-28 flex-shrink-0 text-left">
+                    <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 block">
+                      {slot.time_slot}
+                    </span>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{slot.location}</span>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">{slot.activity}</h4>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {slot.lead_person}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">{slot.notes}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
           {/* TAB 4: VENDORS & CHECKLIST */}
           {activeTab === "vendors" && (
             <div className="space-y-6">
-              {/* Grounded Vendor Shortlist */}
+              {/* Grounded Vendor Directory Recommendations */}
               <div>
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5 mb-3">
-                  <Store className="w-4 h-4 text-primary" />
-                  Recommended Grounded Vendors (Mangaluru)
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-3">
+                  <Store className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  Grounded Mangaluru Vendor Shortlist
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {plan.vendor_shortlist?.map((v, idx) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {currentPlan.vendor_shortlist?.map((v, idx) => (
                     <div
                       key={idx}
-                      className="p-4 rounded-xl border border-border bg-card space-y-2 hover:border-primary/40 transition-colors"
+                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shadow-xs hover:border-amber-400/60 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
                             {v.category}
                           </span>
-                          <h4 className="font-bold text-foreground text-sm">{v.vendor_name}</h4>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">{v.vendor_name}</h4>
                         </div>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             v.price_status === "confirmed"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                              : "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
                           }`}
                         >
-                          {v.price_status === "confirmed" ? "Price Confirmed" : "To confirm"}
+                          {v.price_status === "confirmed" ? "Price Confirmed" : "Estimate"}
                         </span>
                       </div>
 
-                      <p className="text-xs text-muted-foreground leading-relaxed">{v.reason}</p>
-
-                      <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Estimated Pricing:</span>
-                        <span className="font-bold text-foreground">
-                          {v.estimated_price_low !== null && v.estimated_price_low !== undefined
-                            ? `${formatCurrency(Number(v.estimated_price_low))} – ${formatCurrency(
-                                Number(v.estimated_price_high || v.estimated_price_low)
-                              )}`
-                            : "Pricing to confirm"}
-                        </span>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        {v.estimated_price_low && v.estimated_price_high
+                          ? `${formatCurrency(v.estimated_price_low)} – ${formatCurrency(v.estimated_price_high)}`
+                          : "Custom Quote"}
+                        {v.price_unit && (
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal ml-1">
+                            ({v.price_unit})
+                          </span>
+                        )}
                       </div>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed">
+                        "{v.reason}"
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -404,23 +782,25 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
 
               {/* Vendor Category Questions Checklist */}
               <div>
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5 mb-3">
-                  <HelpCircle className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-3">
+                  <HelpCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Vendor Category Checklist & Negotiation Questions
                 </h3>
                 <div className="space-y-3">
-                  {plan.checklist?.map((chk, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-border bg-card space-y-2">
+                  {currentPlan.checklist?.map((chk, idx) => (
+                    <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-foreground">
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">
                           {chk.category}: {chk.item}
                         </span>
-                        <span className="text-xs text-muted-foreground">{chk.due_phase}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {chk.due_phase}
+                        </span>
                       </div>
-                      <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
                         {chk.questions_to_ask_vendor.map((q, qIdx) => (
                           <li key={qIdx} className="flex items-start gap-2">
-                            <span className="text-primary font-bold">•</span>
+                            <span className="text-amber-600 dark:text-amber-400 font-bold">•</span>
                             <span>{q}</span>
                           </li>
                         ))}
@@ -431,17 +811,323 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({ plan, onClose }) =
               </div>
             </div>
           )}
+
+          {/* TAB 5: PHASE 5 REFINE & DIFF VIEWER */}
+          {activeTab === "refine" && (
+            <div className="space-y-6">
+              {/* Success / Error Alerts */}
+              {actionSuccessMessage && (
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 border-2 border-emerald-400 dark:border-emerald-600 text-emerald-900 dark:text-emerald-100 text-xs sm:text-sm font-semibold shadow-xs animate-in fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-700 dark:text-emerald-300 flex-shrink-0" />
+                  <span>{actionSuccessMessage}</span>
+                </div>
+              )}
+              {proposalError && (
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-rose-100 dark:bg-rose-950/70 border-2 border-rose-400 dark:border-rose-600 text-rose-900 dark:text-rose-100 text-xs sm:text-sm font-semibold shadow-xs animate-in fade-in">
+                  <XCircle className="w-5 h-5 text-rose-700 dark:text-rose-300 flex-shrink-0" />
+                  <span>{proposalError}</span>
+                </div>
+              )}
+
+              {/* ACTIVE DIFF VIEWER CARD */}
+              {activeProposal && (
+                <div className="p-5 rounded-2xl border-2 border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 space-y-4 shadow-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 dark:border-amber-800/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900/80 text-amber-950 dark:text-amber-100 border border-amber-400 dark:border-amber-700">
+                        Proposed Change (Pending Review)
+                      </span>
+                      <span className="text-xs text-slate-700 dark:text-slate-300 font-bold font-mono">
+                        Base: v{activeProposal.base_version} → Target: v{activeProposal.base_version + 1}
+                      </span>
+                    </div>
+
+                    {/* Net Budget Impact Pill */}
+                    <div
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                        activeProposal.budget_impact < 0
+                          ? "bg-emerald-200 dark:bg-emerald-900/70 text-emerald-950 dark:text-emerald-100 border border-emerald-400 dark:border-emerald-700"
+                          : activeProposal.budget_impact > 0
+                          ? "bg-rose-200 dark:bg-rose-900/70 text-rose-950 dark:text-rose-100 border border-rose-400 dark:border-rose-700"
+                          : "bg-blue-200 dark:bg-blue-900/70 text-blue-950 dark:text-blue-100 border border-blue-400 dark:border-blue-700"
+                      }`}
+                    >
+                      <span>
+                        Net Impact: {activeProposal.budget_impact < 0 ? "−" : "+"}
+                        {formatCurrency(Math.abs(activeProposal.budget_impact))}
+                        {activeProposal.budget_impact < 0 ? " (Savings)" : " (Increase)"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                      Change Summary
+                    </h4>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-amber-300 dark:border-amber-800 shadow-xs">
+                      {activeProposal.diff.summary}
+                    </p>
+                  </div>
+
+                  {/* Structured Delta Table */}
+                  {activeProposal.diff.category_changes.length > 0 && (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+                      <table className="w-full text-left text-xs sm:text-sm">
+                        <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-700">
+                          <tr>
+                            <th className="py-2.5 px-3 font-bold">Category</th>
+                            <th className="py-2.5 px-3 font-bold text-right">Current Allocation</th>
+                            <th className="py-2.5 px-3 font-bold text-center"></th>
+                            <th className="py-2.5 px-3 font-bold text-right">Proposed Allocation</th>
+                            <th className="py-2.5 px-3 font-bold text-right">Net Change</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {activeProposal.diff.category_changes.map((delta, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                              <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">
+                                {delta.category}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400 line-through">
+                                {formatCurrency(delta.old_amount)}
+                              </td>
+                              <td className="py-3 px-3 text-center text-slate-400">
+                                <ArrowRight className="w-3.5 h-3.5 mx-auto text-slate-400" />
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                {formatCurrency(delta.new_amount)}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-bold">
+                                <span
+                                  className={`inline-block px-2.5 py-0.5 rounded text-xs font-bold ${
+                                    delta.delta < 0
+                                      ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                      : "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                  }`}
+                                >
+                                  {delta.delta < 0 ? "−" : "+"}
+                                  {formatCurrency(Math.abs(delta.delta))}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-100 dark:bg-slate-800/90 font-bold border-t-2 border-slate-200 dark:border-slate-700">
+                          <tr>
+                            <td className="py-3 px-3 text-slate-900 dark:text-white">Total Event Budget</td>
+                            <td className="py-3 px-3 text-right text-slate-600 dark:text-slate-400 line-through font-mono">
+                              {formatCurrency(activeProposal.diff.old_total_budget)}
+                            </td>
+                            <td className="py-3 px-3 text-center text-slate-400">
+                              <ArrowRight className="w-3.5 h-3.5 mx-auto text-slate-400" />
+                            </td>
+                            <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-mono font-bold text-sm">
+                              {formatCurrency(activeProposal.diff.new_total_budget)}
+                            </td>
+                            <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-mono font-bold">
+                              {activeProposal.diff.budget_impact < 0 ? "−" : "+"}
+                              {formatCurrency(Math.abs(activeProposal.diff.budget_impact))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Accept / Reject Action Bar */}
+                  <div className="pt-2 flex items-center justify-end gap-3">
+                    <button
+                      id="btn-reject-change"
+                      type="button"
+                      onClick={handleRejectChange}
+                      disabled={applyingChange}
+                      className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <X className="w-4 h-4" />
+                      Discard Proposal
+                    </button>
+                    <button
+                      id="btn-accept-change"
+                      type="button"
+                      onClick={handleAcceptChange}
+                      disabled={applyingChange}
+                      className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition"
+                    >
+                      {applyingChange ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Applying & Creating Version...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Accept Changes (Creates Plan v{activeProposal.base_version + 1})</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Natural Language Refinement Input Box */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Propose Plan Modification
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                  State desired adjustments in plain language. Festiva's deterministic diff engine computes
+                  the exact budget impacts and generates a structured proposal for your approval.
+                </p>
+
+                {/* Suggestion Chips */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Try asking:</span>
+                  <button
+                    id="btn-suggest-reduce-decor"
+                    type="button"
+                    onClick={() => handleProposeChange("reduce décor by ₹10,000")}
+                    disabled={proposing}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-800 dark:text-slate-200 hover:text-amber-900 dark:hover:text-amber-200 transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    "reduce décor by ₹10,000"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleProposeChange("add ₹15,000 to catering")}
+                    disabled={proposing}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-800 dark:text-slate-200 hover:text-amber-900 dark:hover:text-amber-200 transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    "add ₹15,000 to catering"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleProposeChange("cut photography by 5k")}
+                    disabled={proposing}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-800 dark:text-slate-200 hover:text-amber-900 dark:hover:text-amber-200 transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    "cut photography by 5k"
+                  </button>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <input
+                    id="input-propose-prompt"
+                    type="text"
+                    value={proposalPrompt}
+                    onChange={(e) => setProposalPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleProposeChange();
+                      }
+                    }}
+                    placeholder="e.g. 'reduce décor by ₹10,000' or 'trim venue by 20000'"
+                    className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                  />
+                  <button
+                    id="btn-propose-change"
+                    type="button"
+                    onClick={() => handleProposeChange()}
+                    disabled={proposing || !proposalPrompt.trim()}
+                    className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-sm disabled:opacity-50 transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {proposing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Calculating Diff...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Propose Change</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Streaming AI Copilot Chat */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Copilot Conversational Assistant
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono font-bold">
+                    Plan Context: v{currentPlan.version}
+                  </span>
+                </div>
+
+                {/* Message Scroll Area */}
+                <div className="h-48 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-950/60 p-3 space-y-2.5 text-xs sm:text-sm border border-slate-200 dark:border-slate-800">
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex flex-col ${
+                        msg.role === "user" ? "items-end" : "items-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-xl px-4 py-2.5 ${
+                          msg.role === "user"
+                            ? "bg-amber-600 text-white font-medium"
+                            : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white shadow-xs"
+                        }`}
+                      >
+                        {msg.text || (
+                          <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Thinking...</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chat Form */}
+                <form onSubmit={handleSendChatMessage} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="Ask Copilot a question about vendors, budgets, or traditions..."
+                    disabled={streamingChat}
+                    className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={streamingChat || !chatMessage.trim()}
+                    className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 disabled:opacity-50 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    {streamingChat ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-border bg-muted/30 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Deterministic budget & timeline • Grounded in Mangaluru dataset</span>
           </div>
           <button
+            id="btn-close-plan"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            className="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 transition shadow-xs"
           >
             Close Plan
           </button>

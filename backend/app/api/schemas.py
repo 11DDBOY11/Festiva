@@ -95,3 +95,40 @@ class PlanVersionResponse(BaseModel):
     plan: dict[str, Any]
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: Plan Refinement, Versioning, and Streaming Chat
+# ---------------------------------------------------------------------------
+
+
+class ProposeChangeRequest(BaseModel):
+    prompt: str = Field(..., min_length=2, description="Natural language change request")
+    base_version: int | None = Field(
+        None, description="Base plan version to apply diff against (defaults to current_version)"
+    )
+
+
+class ProposedChangeResponse(BaseModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    base_version: int
+    diff: dict[str, Any]
+    budget_impact: Decimal
+    status: str  # pending | accepted | rejected
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    history: list[dict[str, str]] = Field(default_factory=list)
+
+
+class PlanVersionSummary(BaseModel):
+    version: int
+    created_by: str
+    change_summary: str | None
+    created_at: datetime
+    total_budget: Decimal | None = None

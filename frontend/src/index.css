@@ -5,10 +5,32 @@
 @layer base {
   :root {
     color-scheme: light;
+    --background: 40 20% 98%;        /* #faf9f6 warm light */
+    --foreground: 222 47% 11%;       /* #0f172a slate-900 */
+    --card: 0 0% 100%;               /* #ffffff pure opaque white */
+    --card-foreground: 222 47% 11%;  /* #0f172a */
+    --muted: 210 40% 96%;            /* #f1f5f9 slate-100 */
+    --muted-foreground: 215 16% 35%; /* #334155 slate-700 for WCAG AA */
+    --border: 214 32% 88%;           /* #cbd5e1 slate-300 */
+    --primary: 38 92% 50%;           /* #f59e0b amber-500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 95%;        /* #f1f5f9 */
+    --secondary-foreground: 222 47% 11%;
   }
 
   .dark {
     color-scheme: dark;
+    --background: 222 47% 5%;        /* #020617 slate-950 */
+    --foreground: 210 40% 98%;       /* #f8fafc slate-50 */
+    --card: 222 47% 10%;             /* #0f172a slate-900 */
+    --card-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;            /* #1e293b slate-800 */
+    --muted-foreground: 215 20% 70%; /* #94a3b8 slate-400 */
+    --border: 217 33% 25%;           /* #334155 slate-700 */
+    --primary: 38 92% 50%;           /* #f59e0b amber-500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
   }
 
   /* Default Light Theme */
