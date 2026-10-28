@@ -534,3 +534,13 @@ export function streamPlanChat(
   return () => controller.abort();
 }
 
+export async function exportPlanPdf(eventId: string, version?: number): Promise<Blob> {
+  const query = version ? `?version=${version}` : "";
+  const res = await fetchWithAuth(`/events/${eventId}/export.pdf${query}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to export plan PDF");
+  }
+  return res.blob();
+}
+

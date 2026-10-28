@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  Download,
   ExternalLink,
   HelpCircle,
   History,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   acceptPlanChange,
+  exportPlanPdf,
   getEventPlan,
   getPlanVersions,
   PlanSchema,
@@ -73,6 +75,27 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
     },
   ]);
   const [streamingChat, setStreamingChat] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!eventId) return;
+    setExportingPdf(true);
+    try {
+      const blob = await exportPlanPdf(eventId, currentPlan.version);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Festiva_Plan_${eventId}_v${currentPlan.version}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      alert(err.message || "Failed to download plan PDF");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   // Prevent page behind modal from scrolling while modal is open
   useEffect(() => {
@@ -315,6 +338,22 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
               </h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                id="btn-header-export-pdf"
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                title="Export this plan as a printable PDF"
+              >
+                {exportingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                )}
+                <span className="hidden sm:inline">Export PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </button>
               <button
                 id="btn-header-suggest-changes"
                 type="button"
@@ -1141,13 +1180,29 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
             <span className="hidden sm:inline">Deterministic budget & timeline • Grounded in Mangaluru dataset</span>
             <span className="sm:hidden text-[11px]">Deterministic Mangaluru plan</span>
           </div>
-          <button
-            id="btn-close-plan"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 transition shadow-xs cursor-pointer"
-          >
-            Close Plan
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-footer-export-pdf"
+              type="button"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {exportingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+              ) : (
+                <Download className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              )}
+              <span>Export PDF</span>
+            </button>
+            <button
+              id="btn-close-plan"
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 transition shadow-xs cursor-pointer"
+            >
+              Close Plan
+            </button>
+          </div>
         </div>
       </div>
     </div>

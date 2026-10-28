@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,6 +30,7 @@ from app.domain.diff_engine import (
 )
 from app.domain.plan_generator import generate_plan
 from app.domain.schemas import PlanSchema
+from app.services.pdf_exporter import generate_plan_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -600,5 +601,45 @@ def chat_event_plan(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/{event_id}/export.pdf")
+def export_event_plan_pdf(
+    event_id: UUID,
+    version: int | None = Query(None, description="Specific plan version to export"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Export event plan as a print-styled PDF document with ₹ formatting and tables."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    target_ver = version or event.current_version or 1
+    plan_ver = db.execute(
+        select(PlanVersion).where(
+            PlanVersion.event_id == event_id, PlanVersion.version == target_ver
+        )
+    ).scalar_one_or_none()
+    if not plan_ver or not plan_ver.plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan version {target_ver} not found for this event",
+        )
+
+    plan = PlanSchema.model_validate(plan_ver.plan)
+    pdf_bytes = generate_plan_pdf(event=event, plan=plan)
+
+    filename = f"festiva_plan_{event_id}_v{target_ver}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache",
         },
     )
