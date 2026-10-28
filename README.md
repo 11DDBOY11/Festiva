@@ -1,5 +1,7 @@
 # Festiva AI
 
+[![CI](https://github.com/11DDBOY11/Festiva/actions/workflows/ci.yml/badge.svg)](https://github.com/11DDBOY11/Festiva/actions/workflows/ci.yml)
+
 A budget-aware, RAG-powered celebration and event planning copilot for Mangaluru.
 
 ## Quick Start
