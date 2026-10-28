@@ -67,22 +67,23 @@ All commands automatically utilize the local `backend/.venv` environment across 
 | `make migrate` | `.\make.bat migrate` or `.\make.ps1 migrate` | Apply Alembic migrations to current database |
 | `make dev` | `.\make.bat dev` or `.\make.ps1 dev` | Launch local Uvicorn dev server on port 8000 |
 
-## Implementation Roadmap (12 Phases)
+## Implementation Roadmap (13 Phases)
 
 | Phase | Focus | Key Deliverables & Exit Criteria |
 | :--- | :--- | :--- |
 | **Phase 1** | Foundation & Auth | Monorepo, Postgres + pgvector, FastAPI, JWT auth with token rotation, events CRUD, React PWA shell, CI with lint and tests, LLMClient interface. |
 | **Phase 2** | Full Schema & Seed | Full schema migrations, budget rules engine (wedding/birthday/community), 20 sample Mangaluru vendors, Pydantic models & validators. |
-| **Phase 3** | Brief Parser & Evals | Structured brief parser, clarifying-question loop, plan JSON schema, 10 eval briefs (live + replay), UI brief intake. |
-| **Phase 4** | Plan Generation & UI | Deterministic budget engine, timeline generator, vendor category checklist, full plan viewer UI. |
-| **Phase 5** | Plan Versioning & MVP | Immutable plan_versions, proposed_changes diff viewer (accept/reject), chat refinement, PDF export. MVP Birthday demo runs end-to-end. |
-| **Phase 6** | Evaluation Harness | Complete 25-brief eval suite with accuracy/repair metrics; CI regression harness. |
+| **Phase 3** | Brief Parser & Evals | Structured brief parser, clarifying-question loop, plan JSON schema, 15 eval briefs (live + replay), UI brief intake. |
+| **Phase 4** | Plan Generation & UI | Deterministic budget engine, timeline generator, vendor category checklist, responsive plan viewer UI. |
+| **Phase 5** | Plan Versioning & Refinement | Immutable plan_versions, proposed_changes diff engine with LLM proposal ops (adjust_category, set_total_budget, add_task, remove_task, add_vendor_category, set_setting), diff viewer with accept/reject, optimistic locking with 1-shot rebase, streaming chat refinement, prominent venue showcase card with Google Maps redirection, segmented tabs navigation. |
+| **Phase 6** | Evaluation Harness & Demo | Complete 25-brief eval suite with accuracy/repair metrics, CI regression harness, PDF export (print-styled HTML), and the full birthday demo script. |
 | **Phase 7** | RAG Ingestion Pipeline| Chunking & embedding pipeline, CLI ingestion, pgvector index, metadata-filtered retrieval, 50+ vendors loaded. recall@5 >= 80%. |
 | **Phase 8** | Vendor Features | Vendor shortlist & comparison UI, grounding validators, price honesty verification. Grounding = 100%. |
 | **Phase 9** | Operations & Guests | Operational tracking: expenses, tasks with owners, guests & RSVP tracking, vendor message drafting. |
 | **Phase 10**| Background Jobs | Email reminders for due tasks, read-only share link for family, RBAC. |
 | **Phase 11**| Hardening & Security | Rate limits, input sanitizing, prompt-injection tests, error states, cost tracking. |
 | **Phase 12**| Production & Demo | Public deployment, seed data, final demo video, architecture documentation, before/after eval report. |
+| **Phase 13**| Buffer & Final Write-Up | Buffer period, final security and adversarial hardening review, comprehensive project write-up, before/after benchmarks report, portfolio showcase. |
 
 ## Architecture
 

@@ -58,6 +58,14 @@ class ReplayLLMClient(LLMClient):
         data = self.recordings[self.current_id]
         return response_model.model_validate(data)
 
+    def stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ):
+        yield self.generate(prompt, system_prompt, **kwargs)
+
 
 def run_evals(mode: str = "replay") -> int:
     """Run evaluation benchmark across briefs with honest scoring and loud live failures."""

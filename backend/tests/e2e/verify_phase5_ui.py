@@ -3,15 +3,17 @@
 Automates:
 1. Login with demo credentials
 2. View event plan
-3. Navigate to Refine & Diff Viewer tab
-4. Propose 'reduce décor by ₹10,000'
-5. Verify structured diff (Décor: ₹2,70,000 -> ₹2,60,000, Net Impact: -₹10,000)
-6. Capture desktop diff viewer screenshot
-7. Accept change (creates Plan v2)
-8. Verify Plan v2, updated budget (₹14,90,000), and budget table
-9. Capture desktop Plan v2 screenshot and 390px mobile screenshot
+3. Inspect venue showcase card and segmented tabs
+4. Navigate to Suggestions / Changes tab
+5. Propose 'reduce décor by ₹10,000'
+6. Verify structured diff (Décor: ₹2,70,000 -> ₹2,60,000, Net Impact: -₹10,000)
+7. Capture desktop diff viewer screenshot
+8. Accept change (creates Plan v2)
+9. Verify Plan v2, updated budget, and budget table
+10. Capture desktop Plan v2 screenshot and 390px mobile screenshot
 """
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -21,10 +23,22 @@ from playwright.sync_api import sync_playwright
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-ARTIFACTS_DIR = Path(
-    r"C:\Users\dkk82\.gemini\antigravity\brain\c76ab51a-5c80-4fc8-bc0c-330b4acc9e08"
-)
-BASE_URL = "http://127.0.0.1:3000"
+E2E_DIR = Path(__file__).resolve().parent
+REPO_ROOT = E2E_DIR.parent.parent.parent
+DEFAULT_ARTIFACTS_DIR = REPO_ROOT / ".artifacts"
+
+artifacts_env = os.environ.get("ARTIFACTS_DIR")
+if artifacts_env:
+    ARTIFACTS_DIR = Path(artifacts_env)
+else:
+    # Check conversation brain artifacts directory if present, else use repo relative .artifacts
+    brain_dir = Path(
+        r"C:\Users\dkk82\.gemini\antigravity\brain\c76ab51a-5c80-4fc8-bc0c-330b4acc9e08"
+    )
+    ARTIFACTS_DIR = brain_dir if brain_dir.exists() else DEFAULT_ARTIFACTS_DIR
+
+ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:3000")
 
 
 def run_verification():
@@ -57,7 +71,6 @@ def run_verification():
         # Click View plan on first card
         view_plan_btn = page.locator("#btn-view-plan").first
         if not view_plan_btn.is_visible():
-            # Fallback to text match
             view_plan_btn = page.locator("button:has-text('View plan')").first
 
         print("Clicking View plan...")
@@ -74,7 +87,7 @@ def run_verification():
         print(f"Captured desktop venue and tabs screenshot: {venue_tabs_screenshot}")
 
         # 3. Switch to Suggestions / Changes (Refine) tab
-        print("Switching to Refine & Diff Viewer tab...")
+        print("Switching to Suggestions / Changes tab...")
         page.locator("#tab-btn-refine").click()
         time.sleep(1)
 
@@ -117,7 +130,6 @@ def run_verification():
             err_el = page.locator(".bg-rose-500\\/10").first
             if err_el.is_visible():
                 print(f"Observed error banner: {err_el.inner_text()}")
-            # Check current version badge
             badge_text = page.locator("button:has-text('Plan v')").first.inner_text()
             print(f"Observed current plan button text: {badge_text}")
             page.screenshot(path=str(ARTIFACTS_DIR / "phase5_accept_failure.png"))

@@ -1,15 +1,17 @@
 """Deterministic and LLM-assisted Plan Diff & Refinement Engine for Phase 5.
 
-Translates natural language modification requests (e.g. "reduce décor by ₹10,000")
-into structured, verifiable diffs with explicit budget impacts, supports optimistic locking,
+Translates natural language modification requests (e.g. "reduce décor by ₹10,000",
+"make it weather-safe", "add a kids' zone", "swap to a South Indian theme")
+into a validated list of allowed operations, supports optimistic locking with 1-shot rebase,
 and applies atomic version increments (N -> N+1) with full domain validation.
 """
 
 import copy
 import logging
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +30,105 @@ from app.domain.validators import (
 from app.domain.vendor_directory import get_known_vendor_ids, get_known_vendor_map
 
 logger = logging.getLogger(__name__)
+
+
+class UnsupportedOperationError(ValueError):
+    """Raised when a user requests an operation Festiva cannot perform."""
+
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Allowed Operation Schemas (Pydantic)
+# ---------------------------------------------------------------------------
+
+
+class AdjustCategoryOp(BaseModel):
+    op: Literal["adjust_category"] = "adjust_category"
+    category: str = Field(
+        ...,
+        description="Target budget category name, e.g. 'Decor', 'Catering', 'Photography', 'Venue'",
+    )
+    amount_delta: Decimal | None = Field(
+        None,
+        description="Change in INR (negative for reductions, positive for increases)",
+    )
+    new_amount: Decimal | None = Field(
+        None,
+        description="Target absolute allocation amount in INR",
+    )
+
+
+class SetTotalBudgetOp(BaseModel):
+    op: Literal["set_total_budget"] = "set_total_budget"
+    new_total: Decimal = Field(..., description="New total event budget in INR")
+
+
+class AddTaskOp(BaseModel):
+    op: Literal["add_task"] = "add_task"
+    task: str = Field(..., description="Clear title/description of the milestone task to add")
+    category: str = Field(
+        default="Planning", description="Task category, e.g. 'Venue', 'Decor', 'Entertainment'"
+    )
+    days_before_event: int = Field(
+        default=7, ge=0, description="Days before event date to complete"
+    )
+    priority: str = Field(default="medium", description="Priority level: high, medium, low")
+
+
+class RemoveTaskOp(BaseModel):
+    op: Literal["remove_task"] = "remove_task"
+    task_query: str = Field(
+        ..., description="Search phrase or title of the timeline task to remove"
+    )
+
+
+class AddVendorCategoryOp(BaseModel):
+    op: Literal["add_vendor_category"] = "add_vendor_category"
+    category: str = Field(
+        ..., description="Vendor category to add, e.g. 'Weather Protection', 'Kids Entertainment'"
+    )
+    suggested_vendor: str | None = Field(None, description="Optional vendor name if suggested")
+
+
+class SetSettingOp(BaseModel):
+    op: Literal["set_setting"] = "set_setting"
+    key: Literal["weather_safe", "kids_zone", "theme", "dietary_preferences"] = Field(
+        ...,
+        description="Setting key: weather_safe, kids_zone, theme, or dietary_preferences",
+    )
+    value: str = Field(
+        ..., description="Setting value (e.g. 'true', 'Traditional South Indian & Coastal')"
+    )
+
+
+PlanOp = Annotated[
+    AdjustCategoryOp
+    | SetTotalBudgetOp
+    | AddTaskOp
+    | RemoveTaskOp
+    | AddVendorCategoryOp
+    | SetSettingOp,
+    Field(discriminator="op"),
+]
+
+
+class LLMPlanProposal(BaseModel):
+    """Structured extraction of modification intent from user prompt."""
+
+    explanation: str = Field(..., description="Brief 1-sentence summary of what is changing")
+    operations: list[PlanOp] = Field(
+        default_factory=list, description="Validated list of allowed operations to apply"
+    )
+    unsupported_request: str | None = Field(
+        None,
+        description="If request is unsupported (e.g. flights/crypto), state reason why",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Plan Diff Models
+# ---------------------------------------------------------------------------
 
 
 class CategoryDelta(BaseModel):
@@ -52,42 +153,42 @@ class PlanDiff(BaseModel):
     summary: str
     category_changes: list[CategoryDelta] = Field(default_factory=list)
     timeline_changes: list[TimelineDelta] = Field(default_factory=list)
+    setting_changes: dict[str, Any] = Field(default_factory=dict)
+    vendor_changes: list[str] = Field(default_factory=list)
     old_total_budget: Decimal
     new_total_budget: Decimal
     budget_impact: Decimal  # net change in total budget (e.g. -10000.00)
 
 
-class LLMChangeIntent(BaseModel):
-    """Structured extraction of modification intent from user prompt."""
+PROPOSAL_SYSTEM_PROMPT = """You are Festiva AI's plan modification specialist in Mangaluru.
+Translate the user's free text modification request into a validated list of allowed operations.
 
-    target_category: str | None = Field(
-        None,
-        description="Budget category targeted (e.g. 'Decor', 'Catering', 'Photography', 'Venue')",
-    )
-    amount_delta: float | None = Field(
-        None,
-        description="Absolute change in INR. Negative for reductions, positive for increases",
-    )
-    new_total_budget: float | None = Field(
-        None, description="If user specifies a new total budget directly"
-    )
-    rebalance_target: str | None = Field(
-        None,
-        description="Category to absorb difference (e.g. 'Contingency' or null if reducing total)",
-    )
-    explanation: str = Field(..., description="Brief 1-sentence description of what is changing")
+Allowed operations:
+1. "adjust_category": modify budget for an existing category (category, amount_delta, new_amount)
+2. "set_total_budget": set overall event budget (new_total)
+3. "add_task": add a milestone task (task, category, days_before_event, priority)
+4. "remove_task": remove a timeline task matching task_query
+5. "add_vendor_category": add a vendor requirement (category, suggested_vendor)
+6. "set_setting": update plan settings (key: weather_safe/kids_zone/theme, value: string)
 
+Special request mappings:
+- "make it weather-safe":
+  * set_setting(key="weather_safe", value="true")
+  * add_task(task="Arrange water-proof monsoon canopy and backup area", category="Venue")
+  * add_vendor_category(category="Weather Protection / Canopy Rentals")
+- "add a kids' zone":
+  * set_setting(key="kids_zone", value="true")
+  * add_task(task="Set up dedicated kids activity and craft play area", category="Entertainment")
+  * add_vendor_category(category="Kids Entertainment & Magic Shows")
+- "swap to a South Indian theme":
+  * set_setting(key="theme", value="Traditional South Indian & Coastal Heritage")
+  * add_task(task="Coordinate traditional South Indian floral decor", category="Decor")
 
-DIFF_PARSER_SYSTEM_PROMPT = (
-    "You are Festiva AI's budget refinement assistant for celebration planning in Mangaluru.\n"
-    "Analyze the user's plan modification request and extract the targeted budget category "
-    "and monetary delta.\n"
-    "Examples:\n"
-    "- 'reduce décor by ₹10,000' -> target_category='Decor', amount_delta=-10000\n"
-    "- 'cut photo budget by 15000' -> target_category='Photography', amount_delta=-15000\n"
-    "- 'add 25k to catering' -> target_category='Catering', amount_delta=25000\n"
-    "- 'decrease venue by 50000' -> target_category='Venue', amount_delta=-50000\n"
-)
+Rules:
+- For unsupported requests (e.g. flights, crypto, gambling, live animals):
+  set unsupported_request to "Can't do that yet: Festiva does not support <reason>".
+- Never invent unauthorized categories or arbitrary operations outside the allowed list.
+"""
 
 
 def _heuristic_extract_delta(
@@ -152,12 +253,22 @@ def _heuristic_extract_delta(
     return matched_cat, amount, desc
 
 
+def _find_matching_category(name: str, available: list[str]) -> str | None:
+    """Case-insensitive fuzzy match for category name."""
+    clean = name.lower().strip()
+    for cat in available:
+        c_low = cat.lower().strip()
+        if clean == c_low or clean in c_low or c_low in clean:
+            return cat
+    return None
+
+
 def generate_plan_diff(
     base_plan: PlanSchema,
     prompt: str,
     client: LLMClient | None = None,
 ) -> PlanDiff:
-    """Compute structured plan diff from user modification prompt."""
+    """Compute plan diff from user modification prompt via LLM with validation & fallback."""
     prompt_clean = prompt.strip()
     if not prompt_clean:
         raise ValueError("Modification prompt cannot be empty.")
@@ -165,105 +276,240 @@ def generate_plan_diff(
     category_names = [c.category for c in base_plan.budget.categories]
     llm = client or get_llm_client()
 
-    # Attempt structured extraction
-    target_category: str | None = None
-    amount_delta: Decimal | None = None
-    summary_text: str = ""
+    proposal: LLMPlanProposal | None = None
+    lower_prompt = prompt_clean.lower()
 
+    # Direct check for obviously unsupported requests before calling LLM
+    unsupported_keywords = [
+        "flight",
+        "airline",
+        "crypto",
+        "bitcoin",
+        "casino",
+        "gambling",
+        "passport",
+        "visa",
+    ]
+    if any(kw in lower_prompt for kw in unsupported_keywords):
+        raise UnsupportedOperationError(
+            "Festiva can't do that yet: Travel booking, legal visas, or crypto are not supported."
+        )
+
+    # 1. Attempt LLM-driven structured extraction
     try:
-        extraction = llm.generate_structured(
+        proposal = llm.generate_structured(
             prompt=(
                 f"User requested change: '{prompt_clean}'\n"
                 f"Existing categories: {', '.join(category_names)}\n"
-                f"Current total budget: INR {base_plan.total_budget:,.0f}"
+                f"Current total budget: INR {base_plan.total_budget:,.0f}\n"
+                f"Event date: {base_plan.event_date or 'TBD'}\n"
+                f"Current theme: {base_plan.meta.get('theme', 'Not set')}"
             ),
-            response_model=LLMChangeIntent,
-            system_prompt=DIFF_PARSER_SYSTEM_PROMPT,
+            response_model=LLMPlanProposal,
+            system_prompt=PROPOSAL_SYSTEM_PROMPT,
         )
-        if extraction.target_category:
-            # Map to nearest category name
-            for c in category_names:
-                if (
-                    c.lower() in extraction.target_category.lower()
-                    or extraction.target_category.lower() in c.lower()
-                ):
-                    target_category = c
-                    break
-        if extraction.amount_delta is not None:
-            amount_delta = Decimal(str(int(extraction.amount_delta)))
-        summary_text = extraction.explanation
     except Exception as exc:
         logger.warning(
-            "LLM diff extraction failed (%s); using deterministic heuristic fallback.", exc
+            "LLM proposal extraction failed (%s); attempting deterministic fallback.", exc
         )
-        target_category, amount_delta, summary_text = _heuristic_extract_delta(
-            prompt_clean, category_names
+        proposal = None
+
+    # Handle unsupported requests flagged by LLM
+    if proposal and proposal.unsupported_request:
+        raise UnsupportedOperationError(
+            f"Festiva can't do that yet: {proposal.unsupported_request}"
         )
 
-    # If extraction did not resolve target category or delta, fallback to heuristic
-    if not target_category or amount_delta is None:
-        target_category, amount_delta, summary_text = _heuristic_extract_delta(
-            prompt_clean, category_names
-        )
+    # Fallback to deterministic regex extractor if LLM gave no operations or failed
+    if not proposal or not proposal.operations:
+        cat_match, delta_match, desc = _heuristic_extract_delta(prompt_clean, category_names)
+        if cat_match and delta_match is not None:
+            proposal = LLMPlanProposal(
+                explanation=desc,
+                operations=[
+                    AdjustCategoryOp(
+                        category=cat_match,
+                        amount_delta=delta_match,
+                    )
+                ],
+            )
+        elif "weather" in lower_prompt or "rain" in lower_prompt or "monsoon" in lower_prompt:
+            proposal = LLMPlanProposal(
+                explanation="Make celebration weather-safe with water-proof arrangements",
+                operations=[
+                    SetSettingOp(key="weather_safe", value="true"),
+                    AddTaskOp(
+                        task="Arrange water-proof monsoon canopy and indoor backup arrangements",
+                        category="Venue",
+                        days_before_event=7,
+                        priority="high",
+                    ),
+                    AddVendorCategoryOp(category="Weather Protection / Canopy Rentals"),
+                ],
+            )
+        elif "kid" in lower_prompt or "children" in lower_prompt:
+            proposal = LLMPlanProposal(
+                explanation="Add dedicated children activity and entertainment zone",
+                operations=[
+                    SetSettingOp(key="kids_zone", value="true"),
+                    AddTaskOp(
+                        task="Set up dedicated kids activity and craft play area",
+                        category="Entertainment",
+                        days_before_event=3,
+                        priority="medium",
+                    ),
+                    AddVendorCategoryOp(category="Kids Entertainment & Magic Shows"),
+                ],
+            )
+        elif "south indian" in lower_prompt or "theme" in lower_prompt:
+            proposal = LLMPlanProposal(
+                explanation="Update theme to Traditional South Indian & Coastal Heritage",
+                operations=[
+                    SetSettingOp(key="theme", value="Traditional South Indian & Coastal Heritage"),
+                    AddTaskOp(
+                        task="Coordinate traditional South Indian floral decor",
+                        category="Decor",
+                        days_before_event=5,
+                        priority="high",
+                    ),
+                ],
+            )
+        else:
+            raise UnsupportedOperationError(
+                f"Festiva can't do that yet: Request '{prompt_clean}' is not an allowed operation."
+            )
 
-    if not target_category or amount_delta is None:
-        raise ValueError(
-            f"Could not determine targeted budget category or amount from request: '{prompt}'"
-        )
-
-    # Locate existing category allocation
-    found_cat = next(
-        (c for c in base_plan.budget.categories if c.category.lower() == target_category.lower()),
-        None,
-    )
-    if not found_cat:
-        raise ValueError(f"Category '{target_category}' not found in current plan budget.")
-
-    old_amount = found_cat.allocated_amount
-    new_amount = old_amount + amount_delta
-    if new_amount < Decimal("0"):
-        raise ValueError(
-            f"Cannot reduce '{found_cat.category}' by ₹{abs(amount_delta):,.0f}; "
-            f"current allocation is only ₹{old_amount:,.0f}."
-        )
+    # 2. Code validates and applies operations (The LLM NEVER writes to the DB)
+    category_deltas: list[CategoryDelta] = []
+    timeline_deltas: list[TimelineDelta] = []
+    setting_changes: dict[str, Any] = {}
+    vendor_changes: list[str] = []
 
     old_total = base_plan.total_budget
-    new_total = old_total + amount_delta
-    if new_total <= Decimal("0"):
-        raise ValueError("Modification would result in non-positive total event budget.")
+    current_total = old_total
 
-    old_share = found_cat.share_pct
-    new_share = round((new_amount / new_total) * Decimal("100"), 2)
+    event_date = base_plan.event_date or (date.today() + timedelta(days=30))
 
-    cat_delta = CategoryDelta(
-        category=found_cat.category,
-        old_amount=old_amount,
-        new_amount=new_amount,
-        delta=amount_delta,
-        old_share_pct=old_share,
-        new_share_pct=new_share,
-    )
+    for op in proposal.operations:
+        if isinstance(op, AdjustCategoryOp):
+            matched = _find_matching_category(op.category, category_names)
+            if not matched:
+                avail = ", ".join(category_names)
+                raise ValueError(
+                    f"Category '{op.category}' not found in plan budget. Available: {avail}"
+                )
+            found_cat = next(c for c in base_plan.budget.categories if c.category == matched)
+            old_amt = found_cat.allocated_amount
 
-    diff_summary = (
-        f"Reduced {found_cat.category} allocation by ₹{abs(amount_delta):,.0f} "
-        f"(from ₹{old_amount:,.0f} to ₹{new_amount:,.0f}). Net budget impact: "
-        f"{'-' if amount_delta < 0 else '+'}₹{abs(amount_delta):,.0f}."
-        if amount_delta < 0
-        else (
-            f"Increased {found_cat.category} allocation by ₹{amount_delta:,.0f} "
-            f"(from ₹{old_amount:,.0f} to ₹{new_amount:,.0f}). Net budget impact: "
-            f"+₹{amount_delta:,.0f}."
-        )
-    )
+            if op.amount_delta is not None:
+                new_amt = old_amt + op.amount_delta
+                delta = op.amount_delta
+            elif op.new_amount is not None:
+                new_amt = op.new_amount
+                delta = new_amt - old_amt
+            else:
+                continue
+
+            if new_amt < Decimal("0"):
+                raise ValueError(
+                    f"Cannot reduce '{matched}' by ₹{abs(delta):,.0f}; "
+                    f"current allocation is only ₹{old_amt:,.0f}."
+                )
+
+            current_total = current_total + delta
+            if current_total <= Decimal("0"):
+                raise ValueError("Modification would result in non-positive total event budget.")
+
+            old_share = found_cat.share_pct
+            new_share = round((new_amt / current_total) * Decimal("100"), 2)
+
+            category_deltas.append(
+                CategoryDelta(
+                    category=matched,
+                    old_amount=old_amt,
+                    new_amount=new_amt,
+                    delta=delta,
+                    old_share_pct=old_share,
+                    new_share_pct=new_share,
+                )
+            )
+
+        elif isinstance(op, SetTotalBudgetOp):
+            if op.new_total <= Decimal("0"):
+                raise ValueError("New total budget must be positive.")
+            delta = op.new_total - current_total
+            current_total = op.new_total
+
+        elif isinstance(op, AddTaskOp):
+            target_d = event_date - timedelta(days=op.days_before_event)
+            # Strict date check: new tasks must not be scheduled before today
+            if target_d < date.today():
+                target_d = date.today()
+
+            timeline_deltas.append(
+                TimelineDelta(
+                    task=op.task,
+                    action="added",
+                    new_date=str(target_d),
+                    reason=f"Added by plan proposal ({op.category}, priority {op.priority})",
+                )
+            )
+
+        elif isinstance(op, RemoveTaskOp):
+            matching_task = next(
+                (t for t in base_plan.timeline if op.task_query.lower() in t.task.lower()), None
+            )
+            if matching_task:
+                timeline_deltas.append(
+                    TimelineDelta(
+                        task=matching_task.task,
+                        action="removed",
+                        old_date=str(matching_task.target_date)
+                        if matching_task.target_date
+                        else None,
+                        reason="Removed by plan proposal",
+                    )
+                )
+
+        elif isinstance(op, AddVendorCategoryOp):
+            vendor_changes.append(op.category)
+
+        elif isinstance(op, SetSettingOp):
+            setting_changes[op.key] = op.value
+
+    budget_impact = current_total - old_total
+
+    # Build clear diff summary
+    summary_parts = []
+    if category_deltas:
+        for cd in category_deltas:
+            act = "Reduced" if cd.delta < 0 else "Increased"
+            summary_parts.append(
+                f"{act} {cd.category} allocation by ₹{abs(cd.delta):,.0f} "
+                f"(from ₹{cd.old_amount:,.0f} to ₹{cd.new_amount:,.0f}). Net budget impact: "
+                f"{'-' if cd.delta < 0 else '+'}₹{abs(cd.delta):,.0f}."
+            )
+    if timeline_deltas:
+        for td in timeline_deltas:
+            summary_parts.append(f"{td.action.capitalize()} milestone task '{td.task}'.")
+    if setting_changes:
+        for k, v in setting_changes.items():
+            summary_parts.append(f"Updated {k.replace('_', ' ')} to {v}.")
+    if vendor_changes:
+        summary_parts.append(f"Added vendor requirement: {', '.join(vendor_changes)}.")
+
+    full_summary = " ".join(summary_parts) if summary_parts else proposal.explanation
 
     return PlanDiff(
         prompt=prompt_clean,
-        summary=diff_summary,
-        category_changes=[cat_delta],
-        timeline_changes=[],
+        summary=full_summary,
+        category_changes=category_deltas,
+        timeline_changes=timeline_deltas,
+        setting_changes=setting_changes,
+        vendor_changes=vendor_changes,
         old_total_budget=old_total,
-        new_total_budget=new_total,
-        budget_impact=amount_delta,
+        new_total_budget=current_total,
+        budget_impact=budget_impact,
     )
 
 
@@ -271,15 +517,14 @@ def apply_plan_diff(
     base_plan: PlanSchema,
     diff: PlanDiff,
 ) -> PlanSchema:
-    """Apply a verified PlanDiff onto base_plan to produce version N+1 with full validation."""
+    """Apply verified PlanDiff onto base_plan to produce version N+1 with domain validation."""
     updated_plan_dict = copy.deepcopy(base_plan.model_dump())
 
-    # Update version number
     new_version = base_plan.version + 1
     updated_plan_dict["version"] = new_version
     updated_plan_dict["total_budget"] = diff.new_total_budget
 
-    # Apply category changes
+    # 1. Apply category changes
     updated_categories: list[BudgetCategoryAllocation] = []
     guest_count = base_plan.guest_count or 100
 
@@ -302,7 +547,6 @@ def apply_plan_diff(
                 )
             )
         else:
-            # Recompute share_pct against new_total_budget
             recomputed_share = round(
                 (cat_item.allocated_amount / diff.new_total_budget) * Decimal("100"), 2
             )
@@ -316,11 +560,10 @@ def apply_plan_diff(
                 )
             )
 
-    # Recalculate contingency to guarantee exact 100% allocation sum if rounding slight off
+    # Balance rounding differences to guarantee exact 100% allocation sum
     allocated_sum = sum(c.allocated_amount for c in updated_categories)
     diff_from_total = diff.new_total_budget - allocated_sum
     if diff_from_total != Decimal("0"):
-        # Adjust contingency category or first category by difference
         contingency_cat = next(
             (c for c in updated_categories if "contingency" in c.category.lower()), None
         )
@@ -335,19 +578,99 @@ def apply_plan_diff(
         currency="INR",
         categories=updated_categories,
     )
-
     updated_plan_dict["budget"] = updated_breakdown.model_dump()
-    updated_plan_dict["summary"] = (
-        f"{base_plan.summary} (Refinement v{new_version}: {diff.summary})"
-    )
 
-    # Construct and validate new plan model
+    # 2. Summary preservation: Stop appending diff text (kept in change_summary)
+    updated_plan_dict["summary"] = base_plan.summary
+
+    # 3. Apply setting changes
+    if not updated_plan_dict.get("meta"):
+        updated_plan_dict["meta"] = {}
+    for k, v in diff.setting_changes.items():
+        updated_plan_dict["meta"][k] = v
+        if k == "theme":
+            updated_plan_dict["meta"]["theme"] = v
+
+    # 4. Apply timeline changes
+    timeline_items: list[dict[str, Any]] = updated_plan_dict.get("timeline", [])
+    removed_titles = {td.task.lower() for td in diff.timeline_changes if td.action == "removed"}
+    if removed_titles:
+        timeline_items = [
+            t for t in timeline_items if t.get("task", "").lower() not in removed_titles
+        ]
+
+    event_date = base_plan.event_date or (date.today() + timedelta(days=30))
+    for td in diff.timeline_changes:
+        if td.action == "added":
+            target_d = (
+                date.fromisoformat(td.new_date) if td.new_date else (event_date - timedelta(days=7))
+            )
+            # Strict date check for new task
+            if target_d < date.today():
+                msg = (
+                    f"New or modified task '{td.task}' cannot be "
+                    f"scheduled before today ({date.today()})."
+                )
+                raise ValueError(msg)
+            timeline_items.append(
+                {
+                    "phase": "Refinement",
+                    "days_before_event": max(0, (event_date - target_d).days),
+                    "target_date": target_d.isoformat(),
+                    "task": td.task,
+                    "category": "Refinement",
+                    "owner": "Host",
+                    "priority": "medium",
+                }
+            )
+
+    updated_plan_dict["timeline"] = timeline_items
+
+    # 5. Apply vendor changes if grounded vendor available
+    if diff.vendor_changes:
+        vendor_shortlist = updated_plan_dict.get("vendor_shortlist", [])
+        for v_cat in diff.vendor_changes:
+            vendor_shortlist.append(
+                {
+                    "category": v_cat,
+                    "vendor_id": None,
+                    "vendor_name": f"Mangaluru {v_cat} Specialist",
+                    "estimated_price_low": None,
+                    "estimated_price_high": None,
+                    "price_unit": "flat",
+                    "is_grounded": False,
+                    "price_status": "to confirm",
+                    "questions_to_ask": [f"Inquire about availability for {v_cat} in Mangaluru."],
+                    "budget_impact": Decimal("0"),
+                    "reason": f"Required for {v_cat}.",
+                    "is_sample": False,
+                }
+            )
+        updated_plan_dict["vendor_shortlist"] = vendor_shortlist
+
+    # Construct validated plan model
     new_plan = PlanSchema.model_validate(updated_plan_dict)
 
-    # Domain validators
+    # -----------------------------------------------------------------------
+    # Domain Validators
+    # -----------------------------------------------------------------------
     b_ok, b_msg = validate_plan_budget(new_plan)
     if not b_ok:
         raise ValueError(f"Refined plan failed budget validation: {b_msg}")
+
+    # Requirement 4 check:
+    # Grandfather existing untouched base tasks that had historical dates,
+    # but strictly verify that any new or changed task is >= today.
+    base_tasks_map = {t.task: t.target_date for t in base_plan.timeline if t.target_date}
+    for task in new_plan.timeline:
+        if task.task not in base_tasks_map or task.target_date != base_tasks_map[task.task]:
+            # This is a new or modified task!
+            if task.target_date and task.target_date < date.today():
+                msg = (
+                    f"New or modified task '{task.task}' cannot be "
+                    f"scheduled before today ({date.today()})."
+                )
+                raise ValueError(msg)
 
     ref_date = date.today()
     if base_plan.timeline:

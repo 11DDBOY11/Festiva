@@ -50,9 +50,12 @@ jobs:
       - name: Run Alembic migrations on Postgres
         run: python -m alembic upgrade head
 
-      - name: Run tests on Postgres
-        run: python -m pytest tests/ -v
+      - name: Run tests on Postgres (including test_changes.py, excluding e2e)
+        run: python -m pytest tests/ --ignore=tests/e2e -v
 
       - name: Run Phase 3 Brief Parser Evals
         run: python tests/evals/eval_brief_parser.py --replay
+
+      - name: Run Phase 5 Plan Diff Evals
+        run: python tests/evals/eval_plan_diff.py --replay
 

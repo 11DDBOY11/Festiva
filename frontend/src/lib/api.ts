@@ -311,6 +311,7 @@ export interface VendorRecommendation {
   questions_to_ask: string[];
   budget_impact: number;
   reason: string;
+  is_sample?: boolean;
 }
 
 export interface PlanSchema {

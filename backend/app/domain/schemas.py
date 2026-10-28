@@ -105,6 +105,7 @@ class VendorRecommendation(BaseModel):
     questions_to_ask: list[str] = Field(default_factory=list)
     budget_impact: Decimal = Decimal("0")
     reason: str = Field(..., description="One-line explanation of fit")
+    is_sample: bool = False
 
 
 class PlanSchema(BaseModel):

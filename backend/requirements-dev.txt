@@ -1,0 +1,4 @@
+# Development & E2E Testing Dependencies
+-r requirements.txt
+playwright>=1.40.0
+pytest-playwright>=0.4.0

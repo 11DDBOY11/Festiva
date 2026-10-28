@@ -1,5 +1,6 @@
 import json
 import logging
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,7 +22,11 @@ from app.api.schemas import (
 )
 from app.db.models import Event, PlanVersion, ProposedChange, User
 from app.db.session import get_db
-from app.domain.diff_engine import PlanDiff, apply_plan_diff, generate_plan_diff
+from app.domain.diff_engine import (
+    PlanDiff,
+    apply_plan_diff,
+    generate_plan_diff,
+)
 from app.domain.plan_generator import generate_plan
 from app.domain.schemas import PlanSchema
 
@@ -366,28 +371,95 @@ def accept_plan_change(
     current_ver = event.current_version or 1
     base_ver = change.base_version
 
-    # If current_ver has advanced past change.base_version, attempt 1-shot rebase
+    diff_model = PlanDiff.model_validate(change.diff)
+
+    # If current_ver has advanced past change.base_version, attempt 1-shot rebase or regenerate
     if current_ver != change.base_version:
         logger.info(
-            "Change base_version %s differs from current %s. Attempting 1-shot rebase.",
+            "Change base_version %s differs from current %s. Checking conflict for rebase.",
             base_ver,
             current_ver,
         )
-        base_ver = current_ver
+        orig_pv = db.execute(
+            select(PlanVersion).where(
+                PlanVersion.event_id == event_id, PlanVersion.version == change.base_version
+            )
+        ).scalar_one_or_none()
+        curr_pv = db.execute(
+            select(PlanVersion).where(
+                PlanVersion.event_id == event_id, PlanVersion.version == current_ver
+            )
+        ).scalar_one_or_none()
+        if not curr_pv:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Current plan version {current_ver} could not be loaded",
+            )
 
-    # Load base plan
-    plan_ver = db.execute(
-        select(PlanVersion).where(PlanVersion.event_id == event_id, PlanVersion.version == base_ver)
-    ).scalar_one_or_none()
-    if not plan_ver:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Base plan version {base_ver} could not be loaded",
-        )
+        current_plan = PlanSchema.model_validate(curr_pv.plan)
+
+        # Check for conflict: Did any category modified in diff_model
+        # also get modified in current_plan compared to orig_pv?
+        conflict = False
+        if orig_pv:
+            orig_plan = PlanSchema.model_validate(orig_pv.plan)
+            orig_cats = {c.category: c.allocated_amount for c in orig_plan.budget.categories}
+            curr_cats = {c.category: c.allocated_amount for c in current_plan.budget.categories}
+            for cd in diff_model.category_changes:
+                if cd.category in orig_cats and cd.category in curr_cats:
+                    if orig_cats[cd.category] != curr_cats[cd.category]:
+                        conflict = True
+                        break
+
+        if conflict:
+            logger.info(
+                "Conflict on stale base. Regenerating against plan v%s.",
+                current_ver,
+            )
+            try:
+                diff_model = generate_plan_diff(base_plan=current_plan, prompt=diff_model.prompt)
+            except Exception as regen_err:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Conflict detected with plan v{current_ver} and "
+                        f"1-shot regeneration failed: {regen_err}"
+                    ),
+                )
+        else:
+            # Rebase diff_model onto current_plan
+            diff_model.old_total_budget = current_plan.total_budget
+            diff_model.new_total_budget = current_plan.total_budget + diff_model.budget_impact
+            curr_cat_map = {
+                c.category.lower(): c.allocated_amount for c in current_plan.budget.categories
+            }
+            for cd in diff_model.category_changes:
+                if cd.category.lower() in curr_cat_map:
+                    curr_amt = curr_cat_map[cd.category.lower()]
+                    cd.old_amount = curr_amt
+                    cd.new_amount = curr_amt + cd.delta
+                    if diff_model.new_total_budget > Decimal("0"):
+                        cd.new_share_pct = round(
+                            (cd.new_amount / diff_model.new_total_budget) * Decimal("100"), 2
+                        )
+
+        base_plan = current_plan
+        base_ver = current_ver
+    else:
+        # Load base plan
+        plan_ver = db.execute(
+            select(PlanVersion).where(
+                PlanVersion.event_id == event_id, PlanVersion.version == base_ver
+            )
+        ).scalar_one_or_none()
+        if not plan_ver:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Base plan version {base_ver} could not be loaded",
+            )
+        base_plan = PlanSchema.model_validate(plan_ver.plan)
 
     try:
-        base_plan = PlanSchema.model_validate(plan_ver.plan)
-        diff_model = PlanDiff.model_validate(change.diff)
         new_plan = apply_plan_diff(base_plan=base_plan, diff=diff_model)
     except Exception as exc:
         logger.error("Failed to apply plan diff: %s", exc)

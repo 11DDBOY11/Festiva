@@ -1,0 +1,177 @@
+{
+  "diff_01_decor_exact": {
+    "prompt": "reduce d\u00e9cor by \u20b910,000",
+    "diff": {
+      "prompt": "reduce d\u00e9cor by \u20b910,000",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "category_changes": [
+        {
+          "category": "Decor",
+          "old_amount": "300000",
+          "new_amount": "290000",
+          "delta": "-10000",
+          "old_share_pct": "20.00",
+          "new_share_pct": "19.46"
+        }
+      ],
+      "timeline_changes": [],
+      "setting_changes": {},
+      "vendor_changes": [],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1490000",
+      "budget_impact": "-10000"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:15:33.063108+00:00",
+      "mode": "live"
+    }
+  },
+  "diff_02_reject_preserves_v1": {
+    "prompt": "reduce d\u00e9cor by \u20b910,000",
+    "diff": {
+      "prompt": "reduce d\u00e9cor by \u20b910,000",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "category_changes": [
+        {
+          "category": "Decor",
+          "old_amount": "300000",
+          "new_amount": "290000",
+          "delta": "-10000",
+          "old_share_pct": "20.00",
+          "new_share_pct": "19.46"
+        }
+      ],
+      "timeline_changes": [],
+      "setting_changes": {},
+      "vendor_changes": [],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1490000",
+      "budget_impact": "-10000"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:15:34.167791+00:00",
+      "mode": "live"
+    }
+  },
+  "diff_03_accept_creates_v2": {
+    "prompt": "reduce d\u00e9cor by \u20b910,000",
+    "diff": {
+      "prompt": "reduce d\u00e9cor by \u20b910,000",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "category_changes": [
+        {
+          "category": "Decor",
+          "old_amount": "300000",
+          "new_amount": "290000",
+          "delta": "-10000",
+          "old_share_pct": "20.00",
+          "new_share_pct": "19.46"
+        }
+      ],
+      "timeline_changes": [],
+      "setting_changes": {},
+      "vendor_changes": [],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1490000",
+      "budget_impact": "-10000"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:15:35.280984+00:00",
+      "mode": "live"
+    }
+  },
+  "diff_04_llm_weather_safe": {
+    "prompt": "make it weather-safe",
+    "diff": {
+      "prompt": "make it weather-safe",
+      "summary": "Added milestone task 'Arrange water-proof monsoon canopy and indoor backup arrangements'. Updated weather safe to true. Added vendor requirement: Weather Protection / Canopy Rentals.",
+      "category_changes": [],
+      "timeline_changes": [
+        {
+          "task": "Arrange water-proof monsoon canopy and indoor backup arrangements",
+          "action": "added",
+          "old_date": null,
+          "new_date": "2026-12-05",
+          "reason": "Added by plan proposal (Venue, priority high)"
+        }
+      ],
+      "setting_changes": {
+        "weather_safe": "true"
+      },
+      "vendor_changes": [
+        "Weather Protection / Canopy Rentals"
+      ],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:15:54.623869+00:00",
+      "mode": "live"
+    }
+  },
+  "diff_05_llm_kids_zone": {
+    "prompt": "add a kids' zone",
+    "diff": {
+      "prompt": "add a kids' zone",
+      "summary": "Added milestone task 'Set up dedicated kids activity and craft play area'. Updated kids zone to true. Added vendor requirement: Kids Entertainment & Magic Shows.",
+      "category_changes": [],
+      "timeline_changes": [
+        {
+          "task": "Set up dedicated kids activity and craft play area",
+          "action": "added",
+          "old_date": null,
+          "new_date": "2026-12-09",
+          "reason": "Added by plan proposal (Entertainment, priority medium)"
+        }
+      ],
+      "setting_changes": {
+        "kids_zone": "true"
+      },
+      "vendor_changes": [
+        "Kids Entertainment & Magic Shows"
+      ],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:16:13.053700+00:00",
+      "mode": "live"
+    }
+  },
+  "diff_06_llm_south_indian_theme": {
+    "prompt": "swap to a South Indian theme",
+    "diff": {
+      "prompt": "swap to a South Indian theme",
+      "summary": "Added milestone task 'Coordinate traditional South Indian floral decor and banana leaf service'. Updated theme to Traditional South Indian & Coastal Heritage.",
+      "category_changes": [],
+      "timeline_changes": [
+        {
+          "task": "Coordinate traditional South Indian floral decor and banana leaf service",
+          "action": "added",
+          "old_date": null,
+          "new_date": "2026-12-07",
+          "reason": "Added by plan proposal (Decor, priority high)"
+        }
+      ],
+      "setting_changes": {
+        "theme": "Traditional South Indian & Coastal Heritage"
+      },
+      "vendor_changes": [],
+      "old_total_budget": "1500000",
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
+    },
+    "metadata": {
+      "model": "llama-3.3-70b-versatile",
+      "timestamp": "2026-10-28T14:16:19.177155+00:00",
+      "mode": "live"
+    }
+  }
+}

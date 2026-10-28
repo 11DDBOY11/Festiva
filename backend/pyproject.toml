@@ -15,6 +15,7 @@ known-first-party = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra --ignore=tests/e2e"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

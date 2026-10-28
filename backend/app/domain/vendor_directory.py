@@ -119,6 +119,7 @@ def select_vendor_shortlist(
                         f"Recommended {chosen.get('category')} in "
                         f"{chosen.get('area', 'Mangaluru')} matching requirements."
                     ),
+                    is_sample=bool(chosen.get("sample", False)),
                 )
             )
 

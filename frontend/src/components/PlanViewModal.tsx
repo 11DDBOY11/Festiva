@@ -225,7 +225,11 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
     venueVendor?.vendor_name ||
     currentPlan.run_of_show?.[0]?.location ||
     "Mangala Heritage Grand Convention Centre";
-  const displayVenueName = rawVenueName.replace(/^\[Sample\]\s*/i, "");
+  // Determine display name using vendor sample flag instead of regex
+  const displayVenueName =
+    venueVendor?.is_sample && rawVenueName.startsWith("[Sample] ")
+      ? rawVenueName.slice(9)
+      : rawVenueName;
   const venueLocation = "Mangaluru, Karnataka";
   const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${displayVenueName}, ${venueLocation}`
@@ -361,9 +365,9 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-1 mt-0.5">
                   <span className="font-medium">📍 {venueLocation}</span>
-                  {venueVendor?.price_low && (
+                  {venueVendor?.estimated_price_low && (
                     <span className="text-slate-500 dark:text-slate-400 font-mono ml-1">
-                      • Tier: {formatCurrency(venueVendor.price_low)} – {formatCurrency(venueVendor.price_high)}
+                      • Tier: {formatCurrency(venueVendor.estimated_price_low)} – {formatCurrency(venueVendor.estimated_price_high)}
                     </span>
                   )}
                 </p>
