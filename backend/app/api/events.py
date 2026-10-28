@@ -28,6 +28,11 @@ from app.domain.diff_engine import (
     apply_plan_diff,
     generate_plan_diff,
 )
+from app.domain.message_drafter import (
+    DraftMessageRequest,
+    VendorInquiryDraft,
+    draft_vendor_inquiry,
+)
 from app.domain.plan_generator import generate_plan
 from app.domain.schemas import PlanSchema
 from app.services.pdf_exporter import generate_plan_pdf
@@ -642,4 +647,40 @@ def export_event_plan_pdf(
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-cache",
         },
+    )
+
+
+@router.post("/{event_id}/messages/draft", response_model=VendorInquiryDraft)
+def draft_event_vendor_message(
+    event_id: UUID,
+    payload: DraftMessageRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> VendorInquiryDraft:
+    """Draft an LLM-assisted, grounded vendor inquiry for a specific category."""
+    event = db.execute(
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+    ).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    current_ver = event.current_version or 1
+    plan_ver = db.execute(
+        select(PlanVersion).where(
+            PlanVersion.event_id == event_id, PlanVersion.version == current_ver
+        )
+    ).scalar_one_or_none()
+    if not plan_ver or not plan_ver.plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan version {current_ver} not found for this event",
+        )
+
+    plan = PlanSchema.model_validate(plan_ver.plan)
+    return draft_vendor_inquiry(
+        event=event,
+        plan=plan,
+        vendor_category=payload.vendor_category,
+        vendor_name=payload.vendor_name,
+        custom_notes=payload.custom_notes,
     )

@@ -544,3 +544,36 @@ export async function exportPlanPdf(eventId: string, version?: number): Promise<
   return res.blob();
 }
 
+export interface VendorInquiryDraft {
+  vendor_category: string;
+  subject: string;
+  greeting: string;
+  event_summary: string;
+  scope_of_work: string;
+  specific_questions: string[];
+  budget_guideline?: string | null;
+  call_to_action: string;
+  full_message: string;
+  is_template_fallback: boolean;
+}
+
+export async function draftVendorMessage(
+  eventId: string,
+  payload: {
+    vendor_category: string;
+    vendor_name?: string | null;
+    custom_notes?: string | null;
+  }
+): Promise<VendorInquiryDraft> {
+  const res = await fetchWithAuth(`/events/${eventId}/messages/draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to draft vendor message");
+  }
+  return res.json();
+}
+
