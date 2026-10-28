@@ -416,23 +416,72 @@ def generate_plan_diff(
                     f"current allocation is only ₹{old_amt:,.0f}."
                 )
 
-            current_total = current_total + delta
-            if current_total <= Decimal("0"):
-                raise ValueError("Modification would result in non-positive total event budget.")
-
-            old_share = found_cat.share_pct
-            new_share = round((new_amt / current_total) * Decimal("100"), 2)
-
-            category_deltas.append(
-                CategoryDelta(
-                    category=matched,
-                    old_amount=old_amt,
-                    new_amount=new_amt,
-                    delta=delta,
-                    old_share_pct=old_share,
-                    new_share_pct=new_share,
+            # When reducing a category without explicitly changing total budget,
+            # reallocate the freed funds into Contingency / Emergency Buffer.
+            has_explicit_total = any(isinstance(o, SetTotalBudgetOp) for o in proposal.operations)
+            if delta < 0 and not has_explicit_total:
+                freed = abs(delta)
+                contingency_cat = next(
+                    (
+                        c
+                        for c in base_plan.budget.categories
+                        if any(
+                            w in c.category.lower() for w in ["contingency", "buffer", "reserve"]
+                        )
+                    ),
+                    None,
                 )
-            )
+                cont_name = (
+                    contingency_cat.category
+                    if contingency_cat
+                    else "Contingency / Emergency Buffer"
+                )
+                cont_old = contingency_cat.allocated_amount if contingency_cat else Decimal("0")
+                cont_new = cont_old + freed
+                cont_old_share = contingency_cat.share_pct if contingency_cat else Decimal("0")
+                cont_new_share = round((cont_new / old_total) * Decimal("100"), 2)
+
+                category_deltas.append(
+                    CategoryDelta(
+                        category=matched,
+                        old_amount=old_amt,
+                        new_amount=new_amt,
+                        delta=delta,
+                        old_share_pct=found_cat.share_pct,
+                        new_share_pct=round((new_amt / old_total) * Decimal("100"), 2),
+                    )
+                )
+                category_deltas.append(
+                    CategoryDelta(
+                        category=cont_name,
+                        old_amount=cont_old,
+                        new_amount=cont_new,
+                        delta=freed,
+                        old_share_pct=cont_old_share,
+                        new_share_pct=cont_new_share,
+                    )
+                )
+                current_total = old_total
+            else:
+                current_total = current_total + delta
+                if current_total <= Decimal("0"):
+                    raise ValueError(
+                        "Modification would result in non-positive total event budget."
+                    )
+
+                old_share = found_cat.share_pct
+                new_share = round((new_amt / current_total) * Decimal("100"), 2)
+
+                category_deltas.append(
+                    CategoryDelta(
+                        category=matched,
+                        old_amount=old_amt,
+                        new_amount=new_amt,
+                        delta=delta,
+                        old_share_pct=old_share,
+                        new_share_pct=new_share,
+                    )
+                )
 
         elif isinstance(op, SetTotalBudgetOp):
             if op.new_total <= Decimal("0"):
@@ -482,13 +531,30 @@ def generate_plan_diff(
     # Build clear diff summary
     summary_parts = []
     if category_deltas:
-        for cd in category_deltas:
-            act = "Reduced" if cd.delta < 0 else "Increased"
-            summary_parts.append(
-                f"{act} {cd.category} allocation by ₹{abs(cd.delta):,.0f} "
-                f"(from ₹{cd.old_amount:,.0f} to ₹{cd.new_amount:,.0f}). Net budget impact: "
-                f"{'-' if cd.delta < 0 else '+'}₹{abs(cd.delta):,.0f}."
-            )
+        reduced_cds = [cd for cd in category_deltas if cd.delta < 0]
+        reallocated_cds = [
+            cd
+            for cd in category_deltas
+            if cd.delta > 0
+            and any(w in cd.category.lower() for w in ["contingency", "buffer", "reserve"])
+        ]
+        if reduced_cds and reallocated_cds:
+            dest_name = reallocated_cds[0].category
+            for r in reduced_cds:
+                summary_parts.append(
+                    f"Reduced {r.category} allocation by ₹{abs(r.delta):,.0f} "
+                    f"(from ₹{r.old_amount:,.0f} to ₹{r.new_amount:,.0f}) and "
+                    f"reallocated to {dest_name}. "
+                    f"Total event budget remains ₹{old_total:,.0f} (unchanged)."
+                )
+        else:
+            for cd in category_deltas:
+                act = "Reduced" if cd.delta < 0 else "Increased"
+                summary_parts.append(
+                    f"{act} {cd.category} allocation by ₹{abs(cd.delta):,.0f} "
+                    f"(from ₹{cd.old_amount:,.0f} to ₹{cd.new_amount:,.0f}). Net budget impact: "
+                    f"{'-' if cd.delta < 0 else '+'}₹{abs(cd.delta):,.0f}."
+                )
     if timeline_deltas:
         for td in timeline_deltas:
             summary_parts.append(f"{td.action.capitalize()} milestone task '{td.task}'.")
@@ -557,6 +623,22 @@ def apply_plan_diff(
                     allocated_amount=cat_item.allocated_amount,
                     per_guest_cost=cat_item.per_guest_cost,
                     notes=cat_item.notes,
+                )
+            )
+
+    # Append any newly introduced category (e.g. Contingency / Emergency Buffer)
+    existing_cat_names = {c.category.lower() for c in base_plan.budget.categories}
+    for cd in diff.category_changes:
+        if cd.category.lower() not in existing_cat_names and cd.new_amount > Decimal("0"):
+            new_share = round((cd.new_amount / diff.new_total_budget) * Decimal("100"), 2)
+            per_guest = round(cd.new_amount / Decimal(str(guest_count)), 2)
+            updated_categories.append(
+                BudgetCategoryAllocation(
+                    category=cd.category,
+                    share_pct=new_share,
+                    allocated_amount=cd.new_amount,
+                    per_guest_cost=per_guest,
+                    notes=f"Refined in v{new_version}: Reallocated from budget adjustment",
                 )
             )
 

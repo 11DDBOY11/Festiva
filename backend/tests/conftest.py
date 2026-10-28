@@ -16,6 +16,18 @@ from app.main import app
 # Target PostgreSQL database for testing
 DATABASE_URL = os.getenv("TEST_DATABASE_URL", settings.TEST_DATABASE_URL)
 
+# Enforce hermetic unit tests: no unit test calls live Groq
+os.environ["LLM_PROVIDER"] = "fake"
+settings.LLM_PROVIDER = "fake"
+
+
+@pytest.fixture(autouse=True)
+def enforce_fake_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure all unit tests use FakeLLMClient; live LLM calls reserved for eval --live."""
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "fake")
+    monkeypatch.setenv("LLM_PROVIDER", "fake")
+
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,

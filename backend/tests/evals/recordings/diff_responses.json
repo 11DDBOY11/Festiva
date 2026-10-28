@@ -3,7 +3,7 @@
     "prompt": "reduce d\u00e9cor by \u20b910,000",
     "diff": {
       "prompt": "reduce d\u00e9cor by \u20b910,000",
-      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000) and reallocated to Contingency. Total event budget remains \u20b91,500,000 (unchanged).",
       "category_changes": [
         {
           "category": "Decor",
@@ -11,15 +11,23 @@
           "new_amount": "290000",
           "delta": "-10000",
           "old_share_pct": "20.00",
-          "new_share_pct": "19.46"
+          "new_share_pct": "19.33"
+        },
+        {
+          "category": "Contingency",
+          "old_amount": "150000",
+          "new_amount": "160000",
+          "delta": "10000",
+          "old_share_pct": "10.00",
+          "new_share_pct": "10.67"
         }
       ],
       "timeline_changes": [],
       "setting_changes": {},
       "vendor_changes": [],
       "old_total_budget": "1500000",
-      "new_total_budget": "1490000",
-      "budget_impact": "-10000"
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
     },
     "metadata": {
       "model": "llama-3.3-70b-versatile",
@@ -31,7 +39,7 @@
     "prompt": "reduce d\u00e9cor by \u20b910,000",
     "diff": {
       "prompt": "reduce d\u00e9cor by \u20b910,000",
-      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000) and reallocated to Contingency. Total event budget remains \u20b91,500,000 (unchanged).",
       "category_changes": [
         {
           "category": "Decor",
@@ -39,15 +47,23 @@
           "new_amount": "290000",
           "delta": "-10000",
           "old_share_pct": "20.00",
-          "new_share_pct": "19.46"
+          "new_share_pct": "19.33"
+        },
+        {
+          "category": "Contingency",
+          "old_amount": "150000",
+          "new_amount": "160000",
+          "delta": "10000",
+          "old_share_pct": "10.00",
+          "new_share_pct": "10.67"
         }
       ],
       "timeline_changes": [],
       "setting_changes": {},
       "vendor_changes": [],
       "old_total_budget": "1500000",
-      "new_total_budget": "1490000",
-      "budget_impact": "-10000"
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
     },
     "metadata": {
       "model": "llama-3.3-70b-versatile",
@@ -59,7 +75,7 @@
     "prompt": "reduce d\u00e9cor by \u20b910,000",
     "diff": {
       "prompt": "reduce d\u00e9cor by \u20b910,000",
-      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000). Net budget impact: -\u20b910,000.",
+      "summary": "Reduced Decor allocation by \u20b910,000 (from \u20b9300,000 to \u20b9290,000) and reallocated to Contingency. Total event budget remains \u20b91,500,000 (unchanged).",
       "category_changes": [
         {
           "category": "Decor",
@@ -67,15 +83,23 @@
           "new_amount": "290000",
           "delta": "-10000",
           "old_share_pct": "20.00",
-          "new_share_pct": "19.46"
+          "new_share_pct": "19.33"
+        },
+        {
+          "category": "Contingency",
+          "old_amount": "150000",
+          "new_amount": "160000",
+          "delta": "10000",
+          "old_share_pct": "10.00",
+          "new_share_pct": "10.67"
         }
       ],
       "timeline_changes": [],
       "setting_changes": {},
       "vendor_changes": [],
       "old_total_budget": "1500000",
-      "new_total_budget": "1490000",
-      "budget_impact": "-10000"
+      "new_total_budget": "1500000",
+      "budget_impact": "0"
     },
     "metadata": {
       "model": "llama-3.3-70b-versatile",

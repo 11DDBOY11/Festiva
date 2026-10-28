@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.ai.llm_client import get_llm_client
@@ -346,7 +347,7 @@ def accept_plan_change(
 ) -> PlanVersion:
     """Accept a proposed change, increment version to N+1, update event, and mark change applied."""
     event = db.execute(
-        select(Event).where(Event.id == event_id, Event.owner_id == user.id)
+        select(Event).where(Event.id == event_id, Event.owner_id == user.id).with_for_update()
     ).scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
@@ -483,7 +484,14 @@ def accept_plan_change(
     event.status = "active"
     change.status = "applied"
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Concurrent plan update conflict; version already exists. Please retry.",
+        )
     db.refresh(new_plan_version)
     db.refresh(event)
 

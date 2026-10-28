@@ -33,6 +33,8 @@ node_modules/
 .pytest_cache/
 .coverage
 htmlcov/
+tools/
+*.zip
 
 # Alembic bytecode
 *.pyc

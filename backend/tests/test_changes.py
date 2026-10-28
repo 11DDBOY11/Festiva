@@ -64,7 +64,9 @@ def test_propose_change_reduce_decor(client: TestClient) -> None:
 
     assert change_data["status"] == "pending"
     assert change_data["base_version"] == 1
-    assert Decimal(str(change_data["budget_impact"])) == Decimal("-10000.00")
+    # When decor is reduced without explicit total budget decrease,
+    # money is reallocated to Contingency
+    assert Decimal(str(change_data["budget_impact"])) == Decimal("0.00")
 
     diff = change_data["diff"]
     assert "summary" in diff
@@ -79,7 +81,18 @@ def test_propose_change_reduce_decor(client: TestClient) -> None:
         str(decor_change["new_amount"])
     )
     assert delta_check == Decimal("10000.00")
-    assert Decimal(str(diff["new_total_budget"])) == Decimal("1490000.00")
+
+    contingency_change = next(
+        (
+            c
+            for c in diff["category_changes"]
+            if any(w in c["category"].lower() for w in ["contingency", "buffer", "reserve"])
+        ),
+        None,
+    )
+    assert contingency_change is not None
+    assert Decimal(str(contingency_change["delta"])) == Decimal("10000.00")
+    assert Decimal(str(diff["new_total_budget"])) == Decimal("1500000.00")
 
 
 def test_accept_change_creates_version_n_plus_1(client: TestClient) -> None:
@@ -285,6 +298,129 @@ def test_concurrent_accepts_fails_cleanly(client: TestClient) -> None:
     assert "already applied" in res2.json()["detail"].lower()
 
 
+def test_simultaneous_concurrent_accepts_threads(client: TestClient) -> None:
+    """Genuinely concurrent test: two simultaneous accepts on the same base version using threads.
+
+    Asserts exactly one succeeds (HTTP 200), the other fails cleanly (HTTP 400 or 409),
+    and UNIQUE(event_id, version) / row lock guards database integrity.
+    """
+    import concurrent.futures
+
+    from app.api.deps import get_db
+    from app.main import app
+    from tests.conftest import TestingSessionLocal
+
+    orig_override = app.dependency_overrides.get(get_db)
+
+    def thread_safe_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = thread_safe_get_db
+
+    try:
+        headers = _get_auth_headers(client, "genuinely_concurrent@example.com")
+
+        create_res = client.post(
+            "/events/",
+            json={
+                "title": "Concurrent Race Event",
+                "event_type": "birthday",
+                "total_budget": 100000.0,
+            },
+            headers=headers,
+        )
+        event_id = create_res.json()["id"]
+
+        prop_res = client.post(
+            f"/events/{event_id}/changes/propose",
+            json={"prompt": "reduce decor by 5000", "base_version": 1},
+            headers=headers,
+        )
+        change_id = prop_res.json()["id"]
+
+        def call_accept() -> int:
+            res = client.post(f"/events/{event_id}/changes/{change_id}/accept", headers=headers)
+            return res.status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(call_accept), executor.submit(call_accept)]
+            statuses = [f.result() for f in futures]
+
+        # Exactly one thread succeeds with HTTP 200 OK
+        assert statuses.count(status.HTTP_200_OK) == 1
+        # The other thread fails cleanly with 400 Bad Request or 409 Conflict (never 500)
+        failed_status = [s for s in statuses if s != status.HTTP_200_OK][0]
+        assert failed_status in (status.HTTP_400_BAD_REQUEST, status.HTTP_409_CONFLICT)
+
+        # Verify event state is at v2 and only one PlanVersion for v2 exists in DB
+        ev_res = client.get(f"/events/{event_id}", headers=headers)
+        assert ev_res.status_code == status.HTTP_200_OK
+        assert ev_res.json()["current_version"] == 2
+    finally:
+        if orig_override:
+            app.dependency_overrides[get_db] = orig_override
+        else:
+            app.dependency_overrides.pop(get_db, None)
+
+
+def test_decor_reduction_reallocates_to_contingency_and_preserves_total_budget(
+    client: TestClient,
+) -> None:
+    """Assert reducing décor by ₹10,000 reallocates to Contingency
+    and keeps total_budget unchanged.
+    """
+    headers = _get_auth_headers(client, "decor_contingency@example.com")
+    create_res = client.post(
+        "/events/",
+        json={"title": "Decor Contingency Test", "event_type": "birthday", "total_budget": 50000.0},
+        headers=headers,
+    )
+    event_id = create_res.json()["id"]
+    initial_total = Decimal(str(create_res.json()["total_budget"]))
+
+    prop_res = client.post(
+        f"/events/{event_id}/changes/propose",
+        json={"prompt": "reduce decor by 10000", "base_version": 1},
+        headers=headers,
+    )
+    assert prop_res.status_code == status.HTTP_200_OK
+    diff_data = prop_res.json()["diff"]
+
+    # Verify diff shows money went to Contingency
+    decor_delta = next(
+        (d for d in diff_data["category_changes"] if "decor" in d["category"].lower()), None
+    )
+    contingency_delta = next(
+        (
+            d
+            for d in diff_data["category_changes"]
+            if any(w in d["category"].lower() for w in ["contingency", "buffer", "reserve"])
+        ),
+        None,
+    )
+    assert decor_delta is not None
+    assert Decimal(str(decor_delta["delta"])) == Decimal("-10000")
+    assert contingency_delta is not None
+    assert Decimal(str(contingency_delta["delta"])) == Decimal("10000")
+    assert Decimal(str(diff_data["new_total_budget"])) == initial_total
+    assert "contingency" in diff_data["summary"].lower() or "buffer" in diff_data["summary"].lower()
+
+    # Accept change
+    change_id = prop_res.json()["id"]
+    accept_res = client.post(f"/events/{event_id}/changes/{change_id}/accept", headers=headers)
+    assert accept_res.status_code == status.HTTP_200_OK
+
+    # Assert events.total_budget is unchanged after accept
+    event_res = client.get(f"/events/{event_id}", headers=headers)
+    assert event_res.status_code == status.HTTP_200_OK
+    final_total = Decimal(str(event_res.json()["total_budget"]))
+    assert final_total == initial_total
+
+
 def test_forced_invalid_llm_output_retry_and_fallback() -> None:
     """Test forced invalid LLM output triggers repair retry then deterministic fallback."""
     mock_client = MagicMock()
@@ -331,12 +467,19 @@ def test_forced_invalid_llm_output_retry_and_fallback() -> None:
         ),
     )
 
-    # 1. Deterministic fallback should kick in for valid reduction pattern
+    # 1. Deterministic fallback kicks in for valid reduction pattern
+    # (reallocating to contingency)
     diff = generate_plan_diff(base_plan, "reduce décor by ₹10,000", client=mock_client)
-    assert diff.budget_impact == Decimal("-10000")
-    assert diff.new_total_budget == Decimal("490000")
-    assert len(diff.category_changes) == 1
-    assert diff.category_changes[0].category == "Decor"
+    assert diff.budget_impact == Decimal("0")
+    assert diff.new_total_budget == Decimal("500000")
+    decor_delta = next(c for c in diff.category_changes if c.category == "Decor")
+    assert decor_delta.delta == Decimal("-10000")
+    contingency_delta = next(
+        c
+        for c in diff.category_changes
+        if any(w in c.category.lower() for w in ["contingency", "buffer", "reserve"])
+    )
+    assert contingency_delta.delta == Decimal("10000")
 
     # 2. Unsupported request should raise UnsupportedOperationError
     with pytest.raises(UnsupportedOperationError) as exc_info:

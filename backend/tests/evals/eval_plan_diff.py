@@ -211,14 +211,38 @@ def run_diff_evals(mode: str = "replay") -> int:
 
             # Verification based on case type
             if cid == "diff_01_decor_exact":
-                # Check decor reduction was exactly 10,000
+                # Check decor reduction was exactly 10,000, money went to Contingency,
+                # and total budget is preserved
                 decor_delta = next(
                     (d for d in diff.category_changes if "decor" in d.category.lower()), None
                 )
-                if decor_delta and decor_delta.delta == Decimal("-10000"):
-                    if decor_delta.old_amount - decor_delta.new_amount == Decimal("10000"):
+                contingency_delta = next(
+                    (
+                        d
+                        for d in diff.category_changes
+                        if any(
+                            w in d.category.lower() for w in ["contingency", "buffer", "reserve"]
+                        )
+                    ),
+                    None,
+                )
+                if (
+                    decor_delta
+                    and decor_delta.delta == Decimal("-10000")
+                    and decor_delta.old_amount - decor_delta.new_amount == Decimal("10000")
+                    and contingency_delta
+                    and contingency_delta.delta == Decimal("10000")
+                    and diff.new_total_budget == base_plan.total_budget
+                ):
+                    new_plan = apply_plan_diff(base_plan, diff)
+                    if new_plan.total_budget == base_plan.total_budget:
                         case_passed = True
-                notes = f"decor delta={decor_delta.delta if decor_delta else 'missing'}"
+
+                notes = (
+                    f"decor={decor_delta.delta if decor_delta else 'missing'}, "
+                    f"contingency=+{contingency_delta.delta if contingency_delta else 0}, "
+                    f"total_budget={diff.new_total_budget} (unchanged)"
+                )
 
             elif cid == "diff_02_reject_preserves_v1":
                 # Simulate reject: plan remains untouched at v1
