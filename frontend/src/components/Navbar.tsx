@@ -6,14 +6,32 @@ interface NavbarProps {
   user: User | null;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onLogoClick?: () => void;
+  onSignInClick?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ user, theme, onToggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  user,
+  theme,
+  onToggleTheme,
+  onLogoClick,
+  onSignInClick,
+}) => {
   return (
     <header className="sticky top-0 z-40 glass-panel border-b border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
-        <div className="flex items-center gap-3">
+        <div
+          onClick={onLogoClick}
+          className={`flex items-center gap-3 ${onLogoClick ? "cursor-pointer select-none" : ""}`}
+          role={onLogoClick ? "button" : undefined}
+          tabIndex={onLogoClick ? 0 : undefined}
+          onKeyDown={(e) => {
+            if (onLogoClick && (e.key === "Enter" || e.key === " ")) {
+              onLogoClick();
+            }
+          }}
+        >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 font-bold" />
           </div>
@@ -48,6 +66,16 @@ export const Navbar: React.FC<NavbarProps> = ({ user, theme, onToggleTheme }) =>
               <Sun className="w-4 h-4 text-amber-400" />
             )}
           </button>
+
+          {!user && onSignInClick && (
+            <button
+              type="button"
+              onClick={onSignInClick}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-semibold transition cursor-pointer"
+            >
+              Sign In
+            </button>
+          )}
 
           {user && (
             <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800">

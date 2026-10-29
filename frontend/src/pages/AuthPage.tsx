@@ -4,10 +4,16 @@ import { login, register } from "../lib/api";
 
 interface AuthPageProps {
   onAuthSuccess: () => void;
+  initialMode?: "login" | "register";
+  onBackToLanding?: () => void;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
-  const [isLogin, setIsLogin] = useState(true);
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onAuthSuccess,
+  initialMode = "login",
+  onBackToLanding,
+}) => {
+  const [isLogin, setIsLogin] = useState(initialMode === "login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,6 +50,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {onBackToLanding && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 inline-flex items-center gap-1.5 transition cursor-pointer"
+            >
+              ← Back to home
+            </button>
+          </div>
+        )}
+
         {/* Brand Hero */}
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs font-semibold mb-3">

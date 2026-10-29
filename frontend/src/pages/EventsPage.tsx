@@ -77,15 +77,60 @@ export const EventsPage: React.FC = () => {
       setError(null);
       const data = await listEvents();
       setEvents(data);
+      return data;
     } catch (err: any) {
       setError(err.message || "Failed to load events");
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadEvents();
+    const init = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await listEvents();
+        setEvents(data);
+
+        // Auto-open demo event if triggered from landing page
+        if (sessionStorage.getItem("festiva_auto_open_demo") === "true") {
+          sessionStorage.removeItem("festiva_auto_open_demo");
+          let birthdayEvent = data.find(
+            (e) => e.event_type === "birthday" || e.title.toLowerCase().includes("birthday")
+          );
+          if (!birthdayEvent) {
+            try {
+              birthdayEvent = await createEvent({
+                title: "21st Birthday Party - Mangaluru Coastal Celebration",
+                event_type: "birthday",
+                event_date: "2026-11-20",
+                guest_count: 80,
+                total_budget: 75000,
+                city: "Mangaluru",
+              });
+              const refreshed = await listEvents();
+              setEvents(refreshed);
+            } catch (createErr) {
+              console.error("Failed to auto-create demo event:", createErr);
+            }
+          }
+          if (birthdayEvent) {
+            handleViewPlan(birthdayEvent.id);
+          }
+        } else if (sessionStorage.getItem("festiva_auto_open_create") === "true") {
+          sessionStorage.removeItem("festiva_auto_open_create");
+          setIsModalOpen(true);
+        }
+      } catch (err: any) {
+        setError(err.message || "Failed to load events");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
   }, []);
 
   const handleParseBrief = async () => {
