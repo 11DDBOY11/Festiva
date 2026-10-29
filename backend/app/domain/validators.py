@@ -7,11 +7,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from app.domain.budget import validate_budget_shares
 from app.domain.schemas import PlanSchema
 
 
 def validate_plan_budget(plan: PlanSchema, tolerance_pct: float = 1.0) -> tuple[bool, str]:
-    """Validate that category totals equal stated budget ±tolerance_pct."""
+    """Validate category totals equal stated budget ±tolerance_pct and shares sum to 100% ± 0.1%."""
     allocated_sum = plan.budget.allocated_sum
     total = plan.total_budget
     if total <= Decimal("0"):
@@ -25,7 +26,13 @@ def validate_plan_budget(plan: PlanSchema, tolerance_pct: float = 1.0) -> tuple[
             f"₹{total} by {diff_pct:.2f}% (exceeds {tolerance_pct}%)."
         )
         return False, msg
-    return True, "Budget integrity verified."
+
+    # Validate individual shares and their sum to 100.0% ± 0.1%
+    shares_ok, shares_msg = validate_budget_shares(total, plan.budget.categories)
+    if not shares_ok:
+        return False, shares_msg
+
+    return True, "Budget integrity and shares verified."
 
 
 def validate_plan_dates(plan: PlanSchema, reference_today: date | None = None) -> tuple[bool, str]:

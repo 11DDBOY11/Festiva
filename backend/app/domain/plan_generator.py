@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.ai.llm_client import LLMClient, get_llm_client
 from app.domain.budget import calculate_budget
+from app.domain.category_labels import format_category_label
 from app.domain.checklist import get_checklist_for_event, get_run_of_show_for_event
 from app.domain.schemas import (
     BudgetBreakdown,
@@ -313,7 +314,7 @@ def generate_plan(
     for cat in budget_plan.categories:
         budget_allocations.append(
             BudgetCategoryAllocation(
-                category=cat.category.capitalize(),
+                category=format_category_label(cat.category),
                 share_pct=cat.share_pct,
                 allocated_amount=cat.allocated_amount,
                 per_guest_cost=cat.per_guest_cost,

@@ -10,12 +10,13 @@ import copy
 import logging
 import re
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 from app.ai.llm_client import LLMClient, get_llm_client
+from app.domain.category_labels import format_category_label
 from app.domain.schemas import (
     BudgetBreakdown,
     BudgetCategoryAllocation,
@@ -431,29 +432,25 @@ def generate_plan_diff(
                     ),
                     None,
                 )
-                cont_name = (
-                    contingency_cat.category
-                    if contingency_cat
-                    else "Contingency / Emergency Buffer"
-                )
+                cont_name = contingency_cat.category if contingency_cat else "Contingency & Reserve"
                 cont_old = contingency_cat.allocated_amount if contingency_cat else Decimal("0")
                 cont_new = cont_old + freed
                 cont_old_share = contingency_cat.share_pct if contingency_cat else Decimal("0")
-                cont_new_share = round((cont_new / old_total) * Decimal("100"), 2)
+                cont_new_share = round((cont_new / old_total) * Decimal("100"), 1)
 
                 category_deltas.append(
                     CategoryDelta(
-                        category=matched,
+                        category=format_category_label(matched),
                         old_amount=old_amt,
                         new_amount=new_amt,
                         delta=delta,
                         old_share_pct=found_cat.share_pct,
-                        new_share_pct=round((new_amt / old_total) * Decimal("100"), 2),
+                        new_share_pct=round((new_amt / old_total) * Decimal("100"), 1),
                     )
                 )
                 category_deltas.append(
                     CategoryDelta(
-                        category=cont_name,
+                        category=format_category_label(cont_name),
                         old_amount=cont_old,
                         new_amount=cont_new,
                         delta=freed,
@@ -595,17 +592,30 @@ def apply_plan_diff(
     guest_count = base_plan.guest_count or 100
 
     for cat_item in base_plan.budget.categories:
+        clean_name = format_category_label(cat_item.category)
         matching_delta = next(
-            (d for d in diff.category_changes if d.category.lower() == cat_item.category.lower()),
+            (
+                d
+                for d in diff.category_changes
+                if format_category_label(d.category).lower() == clean_name.lower()
+            ),
             None,
         )
         if matching_delta:
             new_amt = matching_delta.new_amount
-            new_share = round((new_amt / diff.new_total_budget) * Decimal("100"), 2)
-            per_guest = round(new_amt / Decimal(str(guest_count)), 2)
+            new_share = (
+                (new_amt / diff.new_total_budget * Decimal("100")).quantize(
+                    Decimal("0.1"), rounding=ROUND_HALF_UP
+                )
+                if diff.new_total_budget > Decimal("0")
+                else Decimal("0.0")
+            )
+            per_guest = (
+                round(new_amt / Decimal(str(guest_count)), 2) if cat_item.per_guest_cost else None
+            )
             updated_categories.append(
                 BudgetCategoryAllocation(
-                    category=cat_item.category,
+                    category=clean_name,
                     share_pct=new_share,
                     allocated_amount=new_amt,
                     per_guest_cost=per_guest,
@@ -613,12 +623,16 @@ def apply_plan_diff(
                 )
             )
         else:
-            recomputed_share = round(
-                (cat_item.allocated_amount / diff.new_total_budget) * Decimal("100"), 2
+            recomputed_share = (
+                (cat_item.allocated_amount / diff.new_total_budget * Decimal("100")).quantize(
+                    Decimal("0.1"), rounding=ROUND_HALF_UP
+                )
+                if diff.new_total_budget > Decimal("0")
+                else Decimal("0.0")
             )
             updated_categories.append(
                 BudgetCategoryAllocation(
-                    category=cat_item.category,
+                    category=clean_name,
                     share_pct=recomputed_share,
                     allocated_amount=cat_item.allocated_amount,
                     per_guest_cost=cat_item.per_guest_cost,
@@ -626,34 +640,53 @@ def apply_plan_diff(
                 )
             )
 
-    # Append any newly introduced category (e.g. Contingency / Emergency Buffer)
-    existing_cat_names = {c.category.lower() for c in base_plan.budget.categories}
+    # Append any newly introduced category (e.g. Contingency & Reserve)
+    existing_cat_names = {c.category.lower() for c in updated_categories}
     for cd in diff.category_changes:
-        if cd.category.lower() not in existing_cat_names and cd.new_amount > Decimal("0"):
-            new_share = round((cd.new_amount / diff.new_total_budget) * Decimal("100"), 2)
-            per_guest = round(cd.new_amount / Decimal(str(guest_count)), 2)
+        cd_clean = format_category_label(cd.category)
+        if cd_clean.lower() not in existing_cat_names and cd.new_amount > Decimal("0"):
+            new_share = (
+                (cd.new_amount / diff.new_total_budget * Decimal("100")).quantize(
+                    Decimal("0.1"), rounding=ROUND_HALF_UP
+                )
+                if diff.new_total_budget > Decimal("0")
+                else Decimal("0.0")
+            )
             updated_categories.append(
                 BudgetCategoryAllocation(
-                    category=cd.category,
+                    category=cd_clean,
                     share_pct=new_share,
                     allocated_amount=cd.new_amount,
-                    per_guest_cost=per_guest,
+                    per_guest_cost=None,
                     notes=f"Refined in v{new_version}: Reallocated from budget adjustment",
                 )
             )
+            existing_cat_names.add(cd_clean.lower())
 
-    # Balance rounding differences to guarantee exact 100% allocation sum
+    # Balance rounding differences on allocated amounts to guarantee sum == total
     allocated_sum = sum(c.allocated_amount for c in updated_categories)
     diff_from_total = diff.new_total_budget - allocated_sum
-    if diff_from_total != Decimal("0"):
+    if diff_from_total != Decimal("0") and updated_categories:
         contingency_cat = next(
             (c for c in updated_categories if "contingency" in c.category.lower()), None
         )
         if contingency_cat:
             contingency_cat.allocated_amount += diff_from_total
-            contingency_cat.share_pct = round(
-                (contingency_cat.allocated_amount / diff.new_total_budget) * Decimal("100"), 2
+        else:
+            updated_categories[0].allocated_amount += diff_from_total
+
+    # Recompute shares from final balanced amounts and balance shares sum to 100.0%
+    if diff.new_total_budget > Decimal("0"):
+        for c in updated_categories:
+            c.share_pct = ((c.allocated_amount / diff.new_total_budget) * Decimal("100")).quantize(
+                Decimal("0.1"), rounding=ROUND_HALF_UP
             )
+
+        shares_sum = sum(c.share_pct for c in updated_categories)
+        shares_diff = Decimal("100.0") - shares_sum
+        if shares_diff != Decimal("0.0") and updated_categories:
+            largest_cat = max(updated_categories, key=lambda c: c.allocated_amount)
+            largest_cat.share_pct += shares_diff
 
     updated_breakdown = BudgetBreakdown(
         total_budget=diff.new_total_budget,
@@ -706,6 +739,18 @@ def apply_plan_diff(
                 }
             )
 
+    # Maintain strict chronological ordering so timeline passes date validation
+    def _safe_timeline_sort_key(t: dict[str, Any]) -> tuple[str, int]:
+        d = t.get("target_date")
+        if isinstance(d, date):
+            d_str = d.isoformat()
+        elif isinstance(d, str):
+            d_str = d
+        else:
+            d_str = "9999-99-99"
+        return (d_str, -t.get("days_before_event", 0))
+
+    timeline_items.sort(key=_safe_timeline_sort_key)
     updated_plan_dict["timeline"] = timeline_items
 
     # 5. Apply vendor changes if grounded vendor available

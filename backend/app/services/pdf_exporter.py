@@ -12,6 +12,7 @@ from decimal import Decimal
 from xhtml2pdf import pisa
 
 from app.db.models import Event
+from app.domain.category_labels import format_category_label
 from app.domain.schemas import PlanSchema
 
 # Locate bundled DejaVuSans font for hermetic Indian Rupee (₹) unicode rendering
@@ -46,10 +47,11 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     budget_categories = plan.budget.categories if plan.budget else []
     budget_rows_html = ""
     for cat in budget_categories:
+        cat_name = format_category_label(cat.category)
         per_guest = format_currency_inr(cat.per_guest_cost) if cat.per_guest_cost else "—"
         budget_rows_html += f"""
         <tr>
-            <td class="font-bold">{cat.category}</td>
+            <td class="font-bold">{cat_name}</td>
             <td class="text-right">{float(cat.share_pct):.1f}%</td>
             <td class="text-right font-bold">{format_currency_inr(cat.allocated_amount)}</td>
             <td class="text-right">{per_guest}</td>
@@ -68,12 +70,13 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
             else f"T-{task.days_before_event}d"
         )
         priority_class = "badge-high" if task.priority.lower() == "high" else "badge-normal"
+        task_cat = format_category_label(task.category)
         timeline_rows_html += f"""
         <tr>
             <td class="font-bold">{task.phase}</td>
             <td>
                 <div class="task-title">{task.task}</div>
-                <div class="task-owner">Owner: {task.owner} &bull; {task.category}</div>
+                <div class="task-owner">Owner: {task.owner} &bull; {task_cat}</div>
             </td>
             <td><span class="{priority_class}">{task.priority.upper()}</span></td>
             <td class="text-right font-mono">{date_str}</td>
@@ -110,9 +113,10 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
             else "Shortlisted"
         )
         reason_text = getattr(v, "reason", "") or "Local Mangaluru vendor"
+        v_cat = format_category_label(v.category)
         vendor_rows_html += f"""
         <tr>
-            <td class="font-bold">{v.category}</td>
+            <td class="font-bold">{v_cat}</td>
             <td>
                 <div class="font-bold">{clean_name} {sample_tag}</div>
                 <div class="text-muted text-small">{reason_text}</div>

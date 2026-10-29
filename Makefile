@@ -1,4 +1,4 @@
-.PHONY: dev test lint format migrate demo eval eval-live eval-plan
+.PHONY: dev test lint format migrate demo eval eval-live eval-plan db-up
 
 ifeq ($(OS),Windows_NT)
     PYTHON ?= $(if $(wildcard backend/.venv/Scripts/python.exe),backend/.venv/Scripts/python.exe,python)
@@ -24,6 +24,13 @@ lint:
 
 format:
 	$(RUFF) format backend/app/ backend/tests/
+
+db-up:
+ifeq ($(OS),Windows_NT)
+	powershell -ExecutionPolicy Bypass -File scripts/db-up.ps1
+else
+	docker compose up -d postgres
+endif
 
 migrate:
 	cd backend && $(ALEMBIC) upgrade head

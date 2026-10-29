@@ -171,13 +171,22 @@ def run_birthday_demo():
         t0 = time.time()
         page.locator("#btn-accept-change").click()
 
-        # Wait for Plan v2 badge
-        page.wait_for_selector("text=Plan v2", timeout=8000)
+        # Wait for Plan v2 badge or banner
+        page.wait_for_selector("text=Plan v2", timeout=10000)
         time.sleep(1)
 
         # Switch to Budget Table tab to verify ₹10,000 reallocated to contingency
         page.locator("#tab-btn-budget").click()
-        time.sleep(0.6)
+        time.sleep(0.8)
+
+        # Assert Contingency & Reserve line is visible with ₹10,000
+        budget_table_text = page.locator("table").first.inner_text()
+        assert "Contingency" in budget_table_text, (
+            "Contingency row must be visible in Plan v2 budget table"
+        )
+        assert "10,000" in budget_table_text, "₹10,000 must be visible in Plan v2 budget table"
+        assert "75,000" in budget_table_text, "Total budget ₹75,000 must remain unchanged"
+        assert "_" not in budget_table_text, "No budget category should contain an underscore"
 
         # Screenshot Step 3: Plan v2
         shot_v2 = ARTIFACTS_DIR / "demo_03_plan_v2.png"
@@ -219,7 +228,7 @@ def run_birthday_demo():
         # 8. Export PDF and Save to Artifacts
         t0 = time.time()
         pdf_res = httpx.get(
-            f"{API_URL}/events/{event_id}/export.pdf",
+            f"{API_URL}/events/{event_id}/export.pdf?version=2",
             headers=auth_headers,
             timeout=15,
         )
@@ -251,6 +260,13 @@ def run_birthday_demo():
     # Assertions on PDF contents
     assert "₹" in extracted_text, "PDF must contain Unicode Indian Rupee symbol (₹)"
     assert "75,000" in extracted_text, "PDF must display total budget ₹75,000"
+    assert "Plan Version 2" in extracted_text, "PDF must export Plan Version 2"
+    assert "Contingency" in extracted_text, "PDF must include Contingency & Reserve line"
+    assert "10,000" in extracted_text, "PDF must display ₹10,000 contingency allocation"
+    assert "Decor_cake" not in extracted_text, "PDF must not contain raw key 'Decor_cake'"
+    assert "Entertainment_photo" not in extracted_text, (
+        "PDF must not contain raw key 'Entertainment_photo'"
+    )
     assert "BUDGET BREAKDOWN" in extracted_text.upper(), "PDF must contain Budget Breakdown section"
     assert "TIMELINE" in extracted_text.upper(), "PDF must contain Timeline section"
     assert "RUN-OF-SHOW" in extracted_text.upper(), "PDF must contain Run-of-Show section"

@@ -38,6 +38,7 @@ import {
   streamPlanChat,
   VendorInquiryDraft,
 } from "../lib/api";
+import { formatCategoryLabel } from "../lib/constants";
 
 interface PlanViewModalProps {
   plan: PlanSchema;
@@ -705,7 +706,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     {currentPlan.budget?.categories?.map((cat, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="py-3 px-3 sm:px-4 font-bold text-slate-900 dark:text-white">
-                          {cat.category}
+                          {formatCategoryLabel(cat.category)}
                         </td>
                         <td className="py-3 px-3 sm:px-4 text-right font-mono text-slate-600 dark:text-slate-300 font-medium">
                           {Number(cat.share_pct).toFixed(1)}%
@@ -758,7 +759,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                         {item.phase}
                       </span>
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {item.category}
+                        {formatCategoryLabel(item.category)}
                       </span>
                       <span
                         className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
@@ -833,7 +834,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
-                            {v.category}
+                            {formatCategoryLabel(v.category)}
                           </span>
                           <h4 className="font-bold text-sm text-slate-900 dark:text-white">{v.vendor_name}</h4>
                         </div>
@@ -898,7 +899,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm text-slate-900 dark:text-white">
-                          {chk.category}: {chk.item}
+                          {formatCategoryLabel(chk.category)}: {chk.item}
                         </span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
@@ -1006,7 +1007,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                           {activeProposal.diff.category_changes.map((delta, idx) => (
                             <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                               <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">
-                                {delta.category}
+                                {formatCategoryLabel(delta.category)}
                               </td>
                               <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400 line-through">
                                 {formatCurrency(delta.old_amount)}
@@ -1281,7 +1282,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                      Draft Vendor Inquiry: {draftModalData.vendor_category}
+                      Draft Vendor Inquiry: {formatCategoryLabel(draftModalData.vendor_category)}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Grounded communication asking for quotes & date availability

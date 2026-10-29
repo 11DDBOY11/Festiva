@@ -8,6 +8,7 @@ import csv
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
+from typing import Any
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 DEFAULT_RULES_CSV = DATA_DIR / "budget_rules.csv"
@@ -148,7 +149,9 @@ def calculate_budget(
             allocations.append(
                 CategoryAllocation(
                     category=rule.category,
-                    share_pct=((catering_amount / total) * 100).quantize(Decimal("0.01")),
+                    share_pct=((catering_amount / total) * Decimal("100")).quantize(
+                        Decimal("0.1"), rounding=ROUND_HALF_UP
+                    ),
                     allocated_amount=catering_amount.quantize(Decimal("1.00")),
                     per_guest_cost=effective_per_guest,
                     is_per_guest_driven=True,
@@ -164,11 +167,13 @@ def calculate_budget(
             allocations.append(
                 CategoryAllocation(
                     category=rule.category,
-                    share_pct=rule.share_pct,
+                    share_pct=((amt / total) * Decimal("100")).quantize(
+                        Decimal("0.1"), rounding=ROUND_HALF_UP
+                    ),
                     allocated_amount=amt,
                     per_guest_cost=None,
                     is_per_guest_driven=False,
-                    notes=f"{rule.share_pct}% allocation",
+                    notes="",
                 )
             )
 
@@ -183,6 +188,25 @@ def calculate_budget(
             default=allocations[0],
         )
         target.allocated_amount += diff
+
+    # Compute actual shares from allocated amounts and balance to exact 100.0%
+    for a in allocations:
+        a.share_pct = ((a.allocated_amount / total) * Decimal("100")).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
+        if not a.is_per_guest_driven:
+            a.notes = f"{a.share_pct:.1f}% allocation"
+
+    shares_sum = sum(a.share_pct for a in allocations)
+    shares_diff = Decimal("100.0") - shares_sum
+    if shares_diff != Decimal("0.0") and allocations:
+        adjust_target = max(
+            allocations,
+            key=lambda a: a.allocated_amount,
+        )
+        adjust_target.share_pct += shares_diff
+        if not adjust_target.is_per_guest_driven:
+            adjust_target.notes = f"{adjust_target.share_pct:.1f}% allocation"
 
     final_total = sum(a.allocated_amount for a in allocations)
 
@@ -209,3 +233,50 @@ def validate_budget_integrity(
 
     diff_pct = abs(allocated - total) / total * 100
     return float(diff_pct) <= tolerance_pct
+
+
+def validate_budget_shares(
+    total_budget: Decimal | float | int,
+    categories: list[Any],
+) -> tuple[bool, str]:
+    """Validate that category shares sum to 100.0% ± 0.1% and amounts sum to total_budget."""
+    total = Decimal(str(total_budget))
+    if total <= Decimal("0"):
+        return False, "Total budget must be positive."
+
+    if not categories:
+        return False, "No budget categories to validate."
+
+    # 1. Verify allocated amounts sum to total_budget exactly
+    allocated_sum = sum(Decimal(str(getattr(c, "allocated_amount", 0))) for c in categories)
+    if allocated_sum != total:
+        return (
+            False,
+            f"Allocated amounts sum (₹{allocated_sum:,.2f}) does not match "
+            f"total budget (₹{total:,.2f}).",
+        )
+
+    # 2. Verify shares sum to 100.0% ± 0.1%
+    shares_sum = sum(Decimal(str(getattr(c, "share_pct", 0))) for c in categories)
+    if abs(shares_sum - Decimal("100.0")) > Decimal("0.1"):
+        return (
+            False,
+            f"Category shares sum ({shares_sum:.2f}%) deviates from 100.0% by more than 0.1%.",
+        )
+
+    # 3. Verify each category's share matches its amount within ±0.15%
+    for c in categories:
+        amt = Decimal(str(getattr(c, "allocated_amount", 0)))
+        share = Decimal(str(getattr(c, "share_pct", 0)))
+        name = getattr(c, "category", "Unknown")
+        expected_share = ((amt / total) * Decimal("100")).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
+        if abs(share - expected_share) > Decimal("0.15"):
+            return (
+                False,
+                f"Category '{name}' share ({share}%) does not match allocated amount "
+                f"(₹{amt:,.2f} of ₹{total:,.2f} = {expected_share}%).",
+            )
+
+    return True, "Budget shares and amounts integrity verified."

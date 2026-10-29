@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from app.domain.category_labels import format_category_label
 from app.domain.schemas import VendorRecommendation
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
@@ -18,18 +19,27 @@ DEFAULT_VENDORS_JSON = DATA_DIR / "vendors.json"
 # Map budget/event category to vendor directory category
 CATEGORY_MAP: dict[str, list[str]] = {
     "venue": ["venue"],
+    "venue & stage": ["venue"],
     "venue_stage": ["venue"],
     "catering": ["caterer"],
     "refreshments": ["caterer"],
     "decor": ["decorator"],
+    "décor": ["decorator"],
     "decor_cake": ["decorator", "bakery"],
+    "décor & custom cake": ["decorator", "bakery"],
+    "decor & custom cake": ["decorator", "bakery"],
     "cake": ["bakery"],
     "photography": ["photographer"],
     "entertainment_photo": ["photographer", "sound_entertainment"],
+    "entertainment & photography": ["photographer", "sound_entertainment"],
     "sound_light": ["sound_entertainment"],
+    "sound & lighting": ["sound_entertainment"],
     "sound_entertainment": ["sound_entertainment"],
+    "sound & entertainment": ["sound_entertainment"],
     "makeup_attire": ["makeup_attire"],
+    "makeup & attire": ["makeup_attire"],
     "logistics_marketing": ["transport"],
+    "logistics & marketing": ["transport"],
 }
 
 
@@ -102,7 +112,7 @@ def select_vendor_shortlist(
 
             shortlist.append(
                 VendorRecommendation(
-                    category=chosen.get("category", cat).capitalize(),
+                    category=format_category_label(chosen.get("category", cat)),
                     vendor_id=vid,
                     vendor_name=chosen.get("name", "Local Vendor"),
                     estimated_price_low=p_low,

@@ -21,11 +21,17 @@ A budget-aware, RAG-powered celebration and event planning copilot for Mangaluru
    # Edit backend/.env with your values
    ```
 
-2. Start infrastructure (Postgres + Redis):
+2. Start database infrastructure (Postgres with pgvector):
 
    ```bash
-   docker compose up -d
+   make db-up          # Or .\scripts\db-up.ps1 on Windows / docker compose up -d on Linux
    ```
+
+   **ONE Reliable Local Database Setup:**
+   - **Host & Port:** `127.0.0.1:5432`
+   - **Database / User / Pass:** `festiva` / `festiva` / `festiva`
+   - **Helper:** Running `make db-up` executes `scripts/db-up.ps1`. It checks if port 5432 is already open. If not, it launches PostgreSQL in WSL background and waits until the port responds.
+   - **Reboot Recovery:** After a Windows restart, simply execute `make db-up` (or `.\scripts\db-up.ps1`). It will spin up PostgreSQL inside WSL and re-establish the `127.0.0.1:5432` socket automatically.
 
 3. Create virtual environment & install backend dependencies:
 
@@ -61,6 +67,7 @@ All commands automatically utilize the local `backend/.venv` environment across 
 
 | Command | Windows (CMD/PowerShell) | Description |
 | :--- | :--- | :--- |
+| `make db-up` | `.\scripts\db-up.ps1` | Ensure local Postgres with pgvector is running and ready on port 5432 |
 | `make test` | `.\make.bat test` or `.\make.ps1 test` | Run pytest suite (all 37 unit & integrity tests) |
 | `make lint` | `.\make.bat lint` or `.\make.ps1 lint` | Run Ruff linter across app/ and tests/ |
 | `make format` | `.\make.bat format` or `.\make.ps1 format` | Run Ruff auto-formatter |
