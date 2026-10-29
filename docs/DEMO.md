@@ -77,3 +77,4 @@ This document outlines the exact, reproducible demonstration flow for Festiva AI
    - Clean, balanced budget table summing to ₹75,000.
    - Chronological timeline and day-of run-of-show.
    - Honest "Notice: Demonstration Data" label.
+

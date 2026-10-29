@@ -92,3 +92,4 @@ python app/db/seed.py
 - **Render Free Tier:** Web services spin down after 15 minutes of inactivity. When awoken, expect an initial 30–45 second cold start latency for the first request.
 - **Neon / Supabase Serverless Postgres:** Free tier database compute may pause after extended inactivity, incurring a ~2-second warm-up latency on initial connection.
 - **Groq Free Tier:** Rate limits of 30 RPM / 14,400 RPD for Llama-3.3-70B. If exceeded, Festiva's automatic fallback immediately engages to ensure uninterrupted planning.
+

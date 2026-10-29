@@ -24,8 +24,8 @@ if ($portActive) {
 
 Write-Host "PostgreSQL is not responding on 127.0.0.1:5432. Launching PostgreSQL via WSL..." -ForegroundColor Yellow
 
-# Start postgres in WSL background
-Start-Process -FilePath "wsl" -ArgumentList "-u", "postgres", "/usr/lib/postgresql/16/bin/postgres", "-D", "/var/lib/postgresql/16/main", "-c", "config_file=/etc/postgresql/16/main/postgresql.conf" -WindowStyle Hidden
+# Start postgres in WSL background service
+wsl -u root /etc/init.d/postgresql start
 
 # Poll for up to 10 seconds
 $maxRetries = 10

@@ -26,3 +26,4 @@ databases:
     databaseName: festiva
     user: festiva
     plan: free
+

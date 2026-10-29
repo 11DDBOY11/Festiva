@@ -79,3 +79,4 @@ python backend/tests/evals/eval_plan_diff.py --replay
 - **Date Validity:** All tasks and milestone deadlines occur in chronological sequence on or before event date.
 - **Price Honesty:** Vendor pricing within realistic Mangaluru benchmark ranges without simulated price drift.
 - **Edit Correctness:** Exact conservation of event total budget across proposed modifications.
+
