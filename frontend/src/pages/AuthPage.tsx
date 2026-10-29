@@ -48,7 +48,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs font-semibold mb-3">
             <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            Budget-Aware & Deterministic
+            Budget-Aware & Reliable Event Planning
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
             Plan celebrations with confidence

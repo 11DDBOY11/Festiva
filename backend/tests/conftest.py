@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.api.deps import get_db
 from app.core.config import settings
@@ -15,6 +16,8 @@ from app.main import app
 
 # Target PostgreSQL database for testing
 DATABASE_URL = os.getenv("TEST_DATABASE_URL", settings.TEST_DATABASE_URL)
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # Enforce hermetic unit tests: no unit test calls live Groq
 os.environ["LLM_PROVIDER"] = "fake"
@@ -30,15 +33,21 @@ def enforce_fake_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
+    poolclass=NullPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def create_test_schema() -> Generator[None, None, None]:
+    """Create PostgreSQL schema once per test session."""
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
 @pytest.fixture(autouse=True)
 def setup_database() -> Generator[None, None, None]:
-    """Ensure schema is created on PostgreSQL, truncate data after each test."""
-    Base.metadata.create_all(bind=engine)
+    """Truncate table data after each test."""
     yield
     with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):

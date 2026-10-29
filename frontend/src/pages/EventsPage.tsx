@@ -462,7 +462,7 @@ export const EventsPage: React.FC = () => {
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
                     <span>Describe your celebration in plain text</span>
-                    <span className="text-[11px] text-slate-500 font-normal">FastAPI POST /briefs/parse</span>
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Festiva AI Parser</span>
                   </label>
                   <textarea
                     rows={3}

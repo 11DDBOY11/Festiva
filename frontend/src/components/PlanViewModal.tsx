@@ -189,7 +189,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
       setProposalPrompt("");
       setActiveTab("refine");
     } catch (err: any) {
-      setProposalError(err.message || "Failed to compute modification diff.");
+      setProposalError(err.message || "Failed to preview plan updates.");
     } finally {
       setProposing(false);
     }
@@ -748,71 +748,87 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
           {/* TAB 2: TIMELINE & TASKS */}
           {activeTab === "timeline" && (
             <div className="space-y-3">
-              {currentPlan.timeline?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start justify-between gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
-                        {item.phase}
+              {(!currentPlan.timeline || currentPlan.timeline.length === 0) ? (
+                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+                  <Calendar className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No timeline tasks found</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Timeline milestones and tasks will appear here once generated.</p>
+                </div>
+              ) : (
+                currentPlan.timeline.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start justify-between gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                          {item.phase}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {formatCategoryLabel(item.category)}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                            item.priority === "high"
+                              ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                              : "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
+                          }`}
+                        >
+                          {item.priority}
+                        </span>
+                      </div>
+                      <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">{item.task}</p>
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Owner: {item.owner}</p>
+                    </div>
+
+                    <div className="text-right flex-shrink-0 pt-0.5">
+                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block font-mono">
+                        {item.target_date ? formatDate(item.target_date) : "TBD"}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {formatCategoryLabel(item.category)}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                          item.priority === "high"
-                            ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
-                            : "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
-                        }`}
-                      >
-                        {item.priority}
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        T{item.days_before_event < 0 ? item.days_before_event : `-${item.days_before_event}`}d
                       </span>
                     </div>
-                    <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">{item.task}</p>
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Owner: {item.owner}</p>
                   </div>
-
-                  <div className="text-right flex-shrink-0 pt-0.5">
-                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block font-mono">
-                      {item.target_date ? formatDate(item.target_date) : "TBD"}
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      T{item.days_before_event < 0 ? item.days_before_event : `-${item.days_before_event}`}d
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
           {/* TAB 3: RUN OF SHOW */}
           {activeTab === "run_of_show" && (
             <div className="space-y-3">
-              {currentPlan.run_of_show?.map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
-                >
-                  <div className="w-28 flex-shrink-0 text-left">
-                    <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 block">
-                      {slot.time_slot}
-                    </span>
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{slot.location}</span>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">{slot.activity}</h4>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {slot.lead_person}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">{slot.notes}</p>
-                  </div>
+              {(!currentPlan.run_of_show || currentPlan.run_of_show.length === 0) ? (
+                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+                  <Clock className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No run-of-show schedule yet</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">A minute-by-minute event day schedule will appear here.</p>
                 </div>
-              ))}
+              ) : (
+                currentPlan.run_of_show.map((slot, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-400/60 transition-colors"
+                  >
+                    <div className="w-28 flex-shrink-0 text-left">
+                      <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 block">
+                        {slot.time_slot}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{slot.location}</span>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">{slot.activity}</h4>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {slot.lead_person}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">{slot.notes}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
@@ -825,67 +841,86 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                   <Store className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Grounded Mangaluru Vendor Shortlist
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {currentPlan.vendor_shortlist?.map((v, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shadow-xs hover:border-amber-400/60 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
-                            {formatCategoryLabel(v.category)}
-                          </span>
-                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">{v.vendor_name}</h4>
+                {(!currentPlan.vendor_shortlist || currentPlan.vendor_shortlist.length === 0) ? (
+                  <div className="text-center py-8 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+                    <Store className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No vendor recommendations yet</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Curated vendor recommendations for your location will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {currentPlan.vendor_shortlist.map((v, idx) => {
+                      const isSample = Boolean(v.is_sample || v.vendor_name.startsWith("[Sample] "));
+                      const cleanVendorName = v.vendor_name.replace(/^\[Sample\]\s*/i, "");
+                      return (
+                        <div
+                          key={idx}
+                          className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shadow-xs hover:border-amber-400/60 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                                {formatCategoryLabel(v.category)}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{cleanVendorName}</h4>
+                                {isSample && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                    Sample Data
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                v.price_status === "confirmed"
+                                  ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                                  : "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                              }`}
+                            >
+                              {v.price_status === "confirmed" ? "Price Confirmed" : "Estimate"}
+                            </span>
+                          </div>
+
+                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                            {v.estimated_price_low && v.estimated_price_high
+                              ? `${formatCurrency(v.estimated_price_low)} – ${formatCurrency(v.estimated_price_high)}`
+                              : "Custom Quote"}
+                            {v.price_unit && (
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal ml-1">
+                                ({v.price_unit})
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed">
+                            "{v.reason}"
+                          </p>
+
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <button
+                              id={`btn-draft-vendor-${idx}`}
+                              type="button"
+                              onClick={() => handleDraftVendorInquiry(v.category, v.vendor_name)}
+                              disabled={draftingCategory === v.category}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 transition cursor-pointer disabled:opacity-50"
+                            >
+                              {draftingCategory === v.category ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                              ) : (
+                                <Mail className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                              )}
+                              <span>Draft Message</span>
+                            </button>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              {v.questions_to_ask?.length || 0} questions
+                            </span>
+                          </div>
                         </div>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            v.price_status === "confirmed"
-                              ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
-                              : "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
-                          }`}
-                        >
-                          {v.price_status === "confirmed" ? "Price Confirmed" : "Estimate"}
-                        </span>
-                      </div>
-
-                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                        {v.estimated_price_low && v.estimated_price_high
-                          ? `${formatCurrency(v.estimated_price_low)} – ${formatCurrency(v.estimated_price_high)}`
-                          : "Custom Quote"}
-                        {v.price_unit && (
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal ml-1">
-                            ({v.price_unit})
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed">
-                        "{v.reason}"
-                      </p>
-
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <button
-                          id={`btn-draft-vendor-${idx}`}
-                          type="button"
-                          onClick={() => handleDraftVendorInquiry(v.category, v.vendor_name)}
-                          disabled={draftingCategory === v.category}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 transition cursor-pointer disabled:opacity-50"
-                        >
-                          {draftingCategory === v.category ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
-                          ) : (
-                            <Mail className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                          )}
-                          <span>Draft Message</span>
-                        </button>
-                        <span className="text-[11px] text-slate-500 font-mono">
-                          {v.questions_to_ask?.length || 0} questions
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Vendor Category Questions Checklist */}
@@ -894,40 +929,48 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                   <HelpCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Vendor Category Checklist & Negotiation Questions
                 </h3>
-                <div className="space-y-3">
-                  {currentPlan.checklist?.map((chk, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">
-                          {formatCategoryLabel(chk.category)}: {chk.item}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            {chk.due_phase}
+                {(!currentPlan.checklist || currentPlan.checklist.length === 0) ? (
+                  <div className="text-center py-8 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+                    <HelpCircle className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No checklist items yet</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Vendor questions and checklist items will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentPlan.checklist.map((chk, idx) => (
+                      <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-slate-900 dark:text-white">
+                            {formatCategoryLabel(chk.category)}: {chk.item}
                           </span>
-                          <button
-                            id={`btn-draft-chk-${idx}`}
-                            type="button"
-                            onClick={() => handleDraftVendorInquiry(chk.category)}
-                            disabled={draftingCategory === chk.category}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 transition cursor-pointer disabled:opacity-50"
-                          >
-                            <Mail className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                            <span>Draft Message</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {chk.due_phase}
+                            </span>
+                            <button
+                              id={`btn-draft-chk-${idx}`}
+                              type="button"
+                              onClick={() => handleDraftVendorInquiry(chk.category)}
+                              disabled={draftingCategory === chk.category}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 transition cursor-pointer disabled:opacity-50"
+                            >
+                              <Mail className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                              <span>Draft Message</span>
+                            </button>
+                          </div>
                         </div>
+                        <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                          {chk.questions_to_ask_vendor.map((q, qIdx) => (
+                            <li key={qIdx} className="flex items-start gap-2">
+                              <span className="text-amber-600 dark:text-amber-400 font-bold">•</span>
+                              <span>{q}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-                        {chk.questions_to_ask_vendor.map((q, qIdx) => (
-                          <li key={qIdx} className="flex items-start gap-2">
-                            <span className="text-amber-600 dark:text-amber-400 font-bold">•</span>
-                            <span>{q}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1099,7 +1142,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                   </h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                  State desired adjustments in plain language. Festiva's deterministic diff engine computes
+                  State desired adjustments in plain language. Festiva calculates
                   the exact budget impacts and generates a structured proposal for your approval.
                 </p>
 
@@ -1158,7 +1201,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     {proposing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Calculating Diff...</span>
+                        <span>Previewing Changes...</span>
                       </>
                     ) : (
                       <>
@@ -1243,8 +1286,8 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
         <div className="shrink-0 p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
             <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="hidden sm:inline">Deterministic budget & timeline • Grounded in Mangaluru dataset</span>
-            <span className="sm:hidden text-[11px]">Deterministic Mangaluru plan</span>
+            <span className="hidden sm:inline">Balanced budget & structured timeline • Grounded in Mangaluru dataset</span>
+            <span className="sm:hidden text-[11px]">Mangaluru event plan</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1337,7 +1380,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
               <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 flex items-center justify-between">
                 <span className="text-[11px] text-slate-500">
                   {draftModalData.is_template_fallback
-                    ? "Generated via deterministic fallback template"
+                    ? "Generated via standard template"
                     : "Generated via Festiva Copilot"}
                 </span>
                 <div className="flex items-center gap-2">
