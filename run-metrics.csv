@@ -1,3 +1,7 @@
 commit_sha,timestamp,configuration,mode,model,schema_validity,repair_rate,clarification_accuracy,budget_integrity,date_validity,vendor_grounding,price_honesty,edit_correctness,p50_latency_ms
 58dab58,2026-10-28T17:12:38.346256+00:00,rules_only_baseline,deterministic,rules-engine-v1,1.0,0.0,0.85,1.0,1.0,1.0,1.0,0.9,12.5
 58dab58,2026-10-28T17:12:38.346256+00:00,llm_without_rag,replay,llama-3.3-70b-versatile,1.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1050.0
+488389c,2026-10-29T01:52:17.085887+00:00,rules_only_baseline,deterministic,rules-engine-v1,1.0,0.0,0.85,1.0,1.0,1.0,1.0,0.9,12.5
+488389c,2026-10-29T01:52:17.085887+00:00,llm_without_rag,replay,llama-3.3-70b-versatile,1.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1050.0
+488389c,2026-10-29T02:08:21.979114+00:00,rules_only_baseline,deterministic,rules-engine-v1,1.0,0.0,0.85,1.0,1.0,1.0,1.0,0.9,12.5
+488389c,2026-10-29T02:08:21.979114+00:00,llm_without_rag,replay,llama-3.3-70b-versatile,1.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1050.0
