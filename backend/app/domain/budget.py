@@ -10,7 +10,9 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
+_ROOT_DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
+_APP_DATA = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = _ROOT_DATA if _ROOT_DATA.exists() else _APP_DATA
 DEFAULT_RULES_CSV = DATA_DIR / "budget_rules.csv"
 
 

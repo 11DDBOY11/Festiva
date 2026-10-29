@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.ai.llm_client import get_llm_client
+from app.ai.llm_client import FakeLLMClient, get_llm_client
 from app.api.deps import get_current_user
 from app.api.schemas import (
     ChatRequest,
@@ -21,6 +21,7 @@ from app.api.schemas import (
     ProposeChangeRequest,
     ProposedChangeResponse,
 )
+from app.core.rate_limit import check_user_llm_cap
 from app.db.models import Event, PlanVersion, ProposedChange, User
 from app.db.session import get_db
 from app.domain.diff_engine import (
@@ -325,7 +326,19 @@ def propose_plan_change(
 
     try:
         base_plan_schema = PlanSchema.model_validate(plan_ver.plan)
-        diff = generate_plan_diff(base_plan=base_plan_schema, prompt=req.prompt)
+        within_cap, usage_count = check_user_llm_cap(user.id)
+        llm_client = None if within_cap else FakeLLMClient()
+        if not within_cap:
+            logger.warning(
+                "User %s exceeded daily LLM cap (%s requests). Reverting to deterministic diff.",
+                user.id,
+                usage_count,
+            )
+        diff = generate_plan_diff(
+            base_plan=base_plan_schema,
+            prompt=req.prompt,
+            client=llm_client,
+        )
     except Exception as exc:
         logger.error("Failed to compute plan diff: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -677,10 +690,19 @@ def draft_event_vendor_message(
         )
 
     plan = PlanSchema.model_validate(plan_ver.plan)
+    within_cap, usage_count = check_user_llm_cap(user.id)
+    llm_client = None if within_cap else FakeLLMClient()
+    if not within_cap:
+        logger.warning(
+            "User %s exceeded daily LLM cap (%s requests). Reverting to template message drafter.",
+            user.id,
+            usage_count,
+        )
     return draft_vendor_inquiry(
         event=event,
         plan=plan,
         vendor_category=payload.vendor_category,
         vendor_name=payload.vendor_name,
         custom_notes=payload.custom_notes,
+        client=llm_client,
     )

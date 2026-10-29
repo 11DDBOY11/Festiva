@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.api.schemas import (
     UserRegister,
     UserResponse,
 )
+from app.core.rate_limit import check_auth_rate_limit
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -29,8 +30,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(data: UserRegister, db: Session = Depends(get_db)) -> User:
+def register(request: Request, data: UserRegister, db: Session = Depends(get_db)) -> User:
     """Create a new user account."""
+    check_auth_rate_limit(request)
     existing = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
     if existing:
         raise HTTPException(
@@ -49,8 +51,9 @@ def register(data: UserRegister, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
+def login(request: Request, data: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
     """Authenticate and return access + refresh tokens, storing jti for rotation."""
+    check_auth_rate_limit(request)
     user = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
