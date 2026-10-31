@@ -34,11 +34,17 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: UUID) -> str:
-    """Short-lived token for API access."""
+    """Short-lived token for API access with pinned claims."""
     expire = datetime.now(UTC) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
     )
-    payload = {"sub": str(user_id), "exp": expire, "type": "access"}
+    payload = {
+        "sub": str(user_id),
+        "exp": expire,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+        "type": "access",
+    }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
 
 
@@ -56,6 +62,8 @@ def create_refresh_token(user_id: UUID, jti: str | None = None) -> tuple[str, st
         "sub": str(user_id),
         "jti": token_jti,
         "exp": expire,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "type": "refresh",
     }
     encoded = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
@@ -65,6 +73,13 @@ def create_refresh_token(user_id: UUID, jti: str | None = None) -> tuple[str, st
 def decode_token(token: str) -> dict | None:
     """Decode and validate a JWT using PyJWT. Returns the payload dict, or ``None`` on failure."""
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.ALGORITHM])
+        return jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=[settings.ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            options={"require": ["exp", "iss", "aud", "sub"]},
+        )
     except jwt.PyJWTError:
         return None

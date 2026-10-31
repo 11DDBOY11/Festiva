@@ -15,7 +15,13 @@ from app.api.schemas import (
     UserRegister,
     UserResponse,
 )
-from app.core.rate_limit import check_auth_rate_limit
+from app.core.password_policy import normalize_email
+from app.core.rate_limit import (
+    check_account_lockout,
+    check_auth_rate_limit,
+    clear_failed_logins,
+    record_failed_login,
+)
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -28,20 +34,24 @@ from app.db.session import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Dummy hash used for constant-time comparison when user doesn't exist
+_DUMMY_HASH = "$2b$12$e8k5.6z6c4N0j5x0mN8qO.8X4bYx3bK8oI7h3wJ0l1k9m2n3p4q5r"
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(request: Request, data: UserRegister, db: Session = Depends(get_db)) -> User:
-    """Create a new user account."""
+    """Create a new user account with normalized email and strong password validation."""
     check_auth_rate_limit(request)
-    existing = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
+    normalized = normalize_email(data.email)
+    existing = db.execute(select(User).where(User.email == normalized)).scalar_one_or_none()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
         )
     user = User(
-        name=data.name,
-        email=data.email,
+        name=data.name.strip(),
+        email=normalized,
         password_hash=hash_password(data.password),
     )
     db.add(user)
@@ -52,14 +62,25 @@ def register(request: Request, data: UserRegister, db: Session = Depends(get_db)
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, data: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
-    """Authenticate and return access + refresh tokens, storing jti for rotation."""
+    """Authenticate with constant-time password check and account lockout protection."""
     check_auth_rate_limit(request)
-    user = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
-    if not user or not verify_password(data.password, user.password_hash):
+    normalized = normalize_email(data.email)
+    check_account_lockout(normalized)
+
+    user = db.execute(select(User).where(User.email == normalized)).scalar_one_or_none()
+
+    # Equal timing: always perform a bcrypt comparison even if user is not found
+    target_hash = user.password_hash if user else _DUMMY_HASH
+    is_valid = verify_password(data.password, target_hash)
+
+    if not user or not is_valid:
+        record_failed_login(normalized)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail="Invalid email or password",
         )
+
+    clear_failed_logins(normalized)
 
     access_token = create_access_token(user.id)
     refresh_token, jti, expires_at = create_refresh_token(user.id)
@@ -77,6 +98,26 @@ def login(request: Request, data: UserLogin, db: Session = Depends(get_db)) -> T
         access_token=access_token,
         refresh_token=refresh_token,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(
+    data: TokenRefresh,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Revoke the presented refresh token and log out the user."""
+    payload = decode_token(data.refresh_token)
+    if payload and payload.get("type") == "refresh":
+        jti = payload.get("jti")
+        if jti:
+            db.execute(
+                update(RefreshToken)
+                .where(RefreshToken.jti == jti, RefreshToken.user_id == user.id)
+                .values(revoked_at=datetime.now(UTC))
+            )
+            db.commit()
+    return {"status": "logged_out"}
 
 
 @router.post("/refresh", response_model=TokenResponse)

@@ -5,7 +5,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.core.password_policy import normalize_email, validate_password_policy
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -15,12 +17,32 @@ from pydantic import BaseModel, EmailStr, Field
 class UserRegister(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=10, max_length=128)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_user_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return normalize_email(v)
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        validate_password_policy(v)
+        return v
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_user_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return normalize_email(v)
+        return v
 
 
 class TokenRefresh(BaseModel):
@@ -48,22 +70,22 @@ class UserResponse(BaseModel):
 
 
 class EventCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=255)
+    title: str = Field(..., min_length=1, max_length=100)
     event_type: str = Field(..., pattern=r"^(wedding|birthday|community)$")
     event_date: date | None = None
-    city: str | None = None
-    guest_count: int | None = Field(None, gt=0)
-    total_budget: Decimal | None = Field(None, gt=0)
-    currency: str = "INR"
+    city: str | None = Field(None, max_length=100)
+    guest_count: int | None = Field(None, ge=1, le=10000)
+    total_budget: Decimal | None = Field(None, ge=Decimal("1000"), le=Decimal("100000000"))
+    currency: str = Field("INR", max_length=3)
 
 
 class EventUpdate(BaseModel):
-    title: str | None = Field(None, min_length=1, max_length=255)
+    title: str | None = Field(None, min_length=1, max_length=100)
     event_type: str | None = Field(None, pattern=r"^(wedding|birthday|community)$")
     event_date: date | None = None
-    city: str | None = None
-    guest_count: int | None = Field(None, gt=0)
-    total_budget: Decimal | None = Field(None, gt=0)
+    city: str | None = Field(None, max_length=100)
+    guest_count: int | None = Field(None, ge=1, le=10000)
+    total_budget: Decimal | None = Field(None, ge=Decimal("1000"), le=Decimal("100000000"))
     status: str | None = Field(None, pattern=r"^(draft|active|completed|cancelled)$")
 
 
@@ -103,9 +125,13 @@ class PlanVersionResponse(BaseModel):
 
 
 class ProposeChangeRequest(BaseModel):
-    prompt: str = Field(..., min_length=2, description="Natural language change request")
+    prompt: str = Field(
+        ..., min_length=2, max_length=1000, description="Natural language change request"
+    )
     base_version: int | None = Field(
-        None, description="Base plan version to apply diff against (defaults to current_version)"
+        None,
+        ge=1,
+        description="Base plan version to apply diff against (defaults to current_version)",
     )
 
 
@@ -122,8 +148,8 @@ class ProposedChangeResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    history: list[dict[str, str]] = Field(default_factory=list)
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=50)
 
 
 class PlanVersionSummary(BaseModel):

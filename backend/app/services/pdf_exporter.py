@@ -5,6 +5,7 @@ key metrics, budget breakdown, milestone timeline, run-of-show itinerary,
 and vendor shortlist with prominent sample data labeling.
 """
 
+import html
 import io
 import os
 from decimal import Decimal
@@ -18,6 +19,25 @@ from app.domain.schemas import PlanSchema
 # Locate bundled DejaVuSans font for hermetic Indian Rupee (₹) unicode rendering
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 FONT_PATH = os.path.join(ASSETS_DIR, "fonts", "DejaVuSans.ttf").replace("\\", "/")
+
+
+def _safe_pdf_link_callback(uri: str, rel: str) -> None:
+    """Security guard for xhtml2pdf: Block SSRF and arbitrary local file reads.
+
+    Only allow the bundled DejaVu font asset; reject all external http(s)://, file://,
+    and relative image/script fetches.
+    """
+    if uri == FONT_PATH or uri.endswith("DejaVuSans.ttf"):
+        return uri
+    # Block any other external or local URI
+    return None
+
+
+def _esc(val: object) -> str:
+    """Safely HTML-escape arbitrary user, vendor, or LLM generated text."""
+    if val is None:
+        return ""
+    return html.escape(str(val))
 
 
 def format_currency_inr(amount: Decimal | float | int | None) -> str:
@@ -47,15 +67,16 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     budget_categories = plan.budget.categories if plan.budget else []
     budget_rows_html = ""
     for cat in budget_categories:
-        cat_name = format_category_label(cat.category)
+        cat_name = _esc(format_category_label(cat.category))
         per_guest = format_currency_inr(cat.per_guest_cost) if cat.per_guest_cost else "—"
+        cat_notes = _esc(cat.notes or "Standard allocation")
         budget_rows_html += f"""
         <tr>
             <td class="font-bold">{cat_name}</td>
             <td class="text-right">{float(cat.share_pct):.1f}%</td>
             <td class="text-right font-bold">{format_currency_inr(cat.allocated_amount)}</td>
             <td class="text-right">{per_guest}</td>
-            <td class="text-muted">{cat.notes or "Standard allocation"}</td>
+            <td class="text-muted">{cat_notes}</td>
         </tr>
         """
 
@@ -70,15 +91,18 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
             else f"T-{task.days_before_event}d"
         )
         priority_class = "badge-high" if task.priority.lower() == "high" else "badge-normal"
-        task_cat = format_category_label(task.category)
+        task_cat = _esc(format_category_label(task.category))
+        task_phase = _esc(task.phase)
+        task_name = _esc(task.task)
+        task_owner = _esc(task.owner)
         timeline_rows_html += f"""
         <tr>
-            <td class="font-bold">{task.phase}</td>
+            <td class="font-bold">{task_phase}</td>
             <td>
-                <div class="task-title">{task.task}</div>
-                <div class="task-owner">Owner: {task.owner} &bull; {task_cat}</div>
+                <div class="task-title">{task_name}</div>
+                <div class="task-owner">Owner: {task_owner} &bull; {task_cat}</div>
             </td>
-            <td><span class="{priority_class}">{task.priority.upper()}</span></td>
+            <td><span class="{priority_class}">{_esc(task.priority.upper())}</span></td>
             <td class="text-right font-mono">{date_str}</td>
             <td class="text-right font-mono">{days_str}</td>
         </tr>
@@ -88,13 +112,18 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     run_of_show = plan.run_of_show or []
     ros_rows_html = ""
     for item in run_of_show:
+        time_slot = _esc(item.time_slot)
+        activity = _esc(item.activity)
+        location = _esc(item.location)
+        lead_person = _esc(item.lead_person)
+        notes = _esc(item.notes or "—")
         ros_rows_html += f"""
         <tr>
-            <td class="font-bold font-mono text-amber">{item.time_slot}</td>
-            <td class="font-bold">{item.activity}</td>
-            <td>{item.location}</td>
-            <td><span class="badge-subtle">{item.lead_person}</span></td>
-            <td class="text-muted">{item.notes or "—"}</td>
+            <td class="font-bold font-mono text-amber">{time_slot}</td>
+            <td class="font-bold">{activity}</td>
+            <td>{location}</td>
+            <td><span class="badge-subtle">{lead_person}</span></td>
+            <td class="text-muted">{notes}</td>
         </tr>
         """
 
@@ -102,18 +131,21 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     vendor_rows_html = ""
     for v in vendors:
         is_sample = getattr(v, "is_sample", False) or "[Sample]" in getattr(v, "vendor_name", "")
-        clean_name = v.vendor_name.replace("[Sample] ", "") if is_sample else v.vendor_name
+        raw_name = v.vendor_name.replace("[Sample] ", "") if is_sample else v.vendor_name
+        clean_name = _esc(raw_name)
         low_fmt = format_currency_inr(v.estimated_price_low)
         high_fmt = format_currency_inr(v.estimated_price_high)
         price_range = f"{low_fmt} – {high_fmt}" if v.estimated_price_low else "Tier based"
         sample_tag = '<span class="badge-sample">Sample Data</span>' if is_sample else ""
-        status_text = (
+        raw_status = (
             getattr(v, "price_status", "confirmed").capitalize()
             if hasattr(v, "price_status")
             else "Shortlisted"
         )
-        reason_text = getattr(v, "reason", "") or "Local Mangaluru vendor"
-        v_cat = format_category_label(v.category)
+        status_text = _esc(raw_status)
+        raw_reason = getattr(v, "reason", "") or "Local Mangaluru vendor"
+        reason_text = _esc(raw_reason)
+        v_cat = _esc(format_category_label(v.category))
         vendor_rows_html += f"""
         <tr>
             <td class="font-bold">{v_cat}</td>
@@ -129,7 +161,7 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     # Optional menu ideas
     menu_html = ""
     if plan.meta and getattr(plan.meta, "menu_ideas", None):
-        items = "".join(f"<li>{dish}</li>" for dish in plan.meta.menu_ideas)
+        items = "".join(f"<li>{_esc(dish)}</li>" for dish in plan.meta.menu_ideas)
         menu_html = f"""
         <div class="section-box">
             <h3 class="section-subtitle">Curated Regional Menu & Culinary Highlights</h3>
@@ -142,11 +174,12 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
     # Optional compressed timeline warning
     warning_html = ""
     if plan.meta and getattr(plan.meta, "compressed_timeline", False):
-        warning_text = getattr(
+        raw_warning = getattr(
             plan.meta,
             "timeline_warning",
             "Event scheduled on short notice. Standard lead times expedited.",
         )
+        warning_text = _esc(raw_warning)
         warning_html = f"""
         <div class="alert-box">
             <strong>Compressed Timeline Advisory:</strong> {warning_text}
@@ -190,12 +223,15 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
         else None
     )
     per_guest_str = format_currency_inr(per_guest_val) if per_guest_val else "—"
+    esc_city = _esc(event.city)
+    esc_type = _esc(event.event_type.capitalize())
+    esc_title = _esc(event.title)
+    esc_summary = _esc(plan.summary)
     event_sub_details = (
-        f"{event.city} &bull; {event_date_str} &bull; "
-        f"{event.guest_count} Guests &bull; {event.event_type.capitalize()}"
+        f"{esc_city} &bull; {event_date_str} &bull; {event.guest_count} Guests &bull; {esc_type}"
     )
     exec_summary_html = (
-        f'<div class="summary-paragraph"><strong>Concept & Ambience:</strong> {plan.summary}</div>'
+        f'<div class="summary-paragraph"><strong>Concept & Ambience:</strong> {esc_summary}</div>'
         if plan.summary
         else ""
     )
@@ -204,7 +240,7 @@ def generate_plan_pdf(event: Event, plan: PlanSchema) -> bytes:
 <html>
 <head>
 <meta charset="utf-8">
-<title>Festiva Plan - {event.title}</title>
+<title>Festiva Plan - {esc_title}</title>
 <style>
 @page {{
     size: A4 portrait;
@@ -463,7 +499,7 @@ ul.menu-list {{
     <tr>
         <td>
             <div class="brand-title">Festiva Event Copilot</div>
-            <div class="event-title">{event.title}</div>
+            <div class="event-title">{esc_title}</div>
             <div style="font-size: 8.5pt; color: #475569; margin-top: 2px;">
                 {event_sub_details}
             </div>
@@ -591,7 +627,9 @@ ul.menu-list {{
 """
 
     out_stream = io.BytesIO()
-    pisa_status = pisa.CreatePDF(html_content, dest=out_stream)
+    pisa_status = pisa.CreatePDF(
+        html_content, dest=out_stream, link_callback=_safe_pdf_link_callback
+    )
     if pisa_status.err:
         raise RuntimeError(f"Failed to generate event plan PDF (Pisa error code {pisa_status.err})")
 

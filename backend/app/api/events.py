@@ -145,6 +145,11 @@ def delete_event(
     ).scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    if user.email == "demo@festiva.ai" and event.title == "Ananya's 21st Birthday Soiree":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The seeded demo showcase event cannot be deleted.",
+        )
     db.delete(event)
     db.commit()
 

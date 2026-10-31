@@ -9,7 +9,9 @@ router = APIRouter(prefix="/briefs", tags=["briefs"])
 
 
 class ParseBriefRequest(BaseModel):
-    raw_text: str = Field(..., min_length=3, description="Unstructured celebration brief")
+    raw_text: str = Field(
+        ..., min_length=3, max_length=5000, description="Unstructured celebration brief"
+    )
 
 
 @router.post("/parse", response_model=BriefParseResponse, status_code=status.HTTP_200_OK)

@@ -56,13 +56,20 @@ class AdjustCategoryOp(BaseModel):
     )
     new_amount: Decimal | None = Field(
         None,
+        ge=Decimal("0"),
+        le=Decimal("100000000"),
         description="Target absolute allocation amount in INR",
     )
 
 
 class SetTotalBudgetOp(BaseModel):
     op: Literal["set_total_budget"] = "set_total_budget"
-    new_total: Decimal = Field(..., description="New total event budget in INR")
+    new_total: Decimal = Field(
+        ...,
+        ge=Decimal("1000"),
+        le=Decimal("100000000"),
+        description="New total event budget in INR (min 1,000, max 100,000,000)",
+    )
 
 
 class AddTaskOp(BaseModel):

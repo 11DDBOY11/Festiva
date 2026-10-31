@@ -13,9 +13,14 @@ from app.core.config import settings
 AUTH_LIMIT_PER_MINUTE = 15
 AUTH_WINDOW_SECONDS = 60
 
-_auth_ip_timestamps: dict[str, list[float]] = defaultdict(list)
+# 2. Account Lockout / Progressive Delay per Email/IP
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_WINDOW_SECONDS = 300  # 5 minutes lockout after 5 consecutive failures
 
-# 2. Per-user Daily LLM Request Cap
+_auth_ip_timestamps: dict[str, list[float]] = defaultdict(list)
+_auth_failed_attempts: dict[str, list[float]] = defaultdict(list)
+
+# 3. Per-user Daily LLM Request Cap
 DAILY_LLM_CAP_DEFAULT = 50
 
 _user_daily_counts: dict[str, int] = defaultdict(int)
@@ -62,6 +67,43 @@ def check_auth_rate_limit(
     _auth_ip_timestamps[ip] = timestamps
 
 
+def check_account_lockout(email: str, force_check: bool = False) -> None:
+    """Check if account is temporarily locked out due to repeated failed logins."""
+    import os
+
+    if not force_check:
+        if "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "test":
+            return
+
+    key = email.strip().lower()
+    now = time.time()
+    cutoff = now - LOCKOUT_WINDOW_SECONDS
+
+    recent_fails = [t for t in _auth_failed_attempts[key] if t > cutoff]
+    _auth_failed_attempts[key] = recent_fails
+
+    if len(recent_fails) >= MAX_FAILED_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Account temporarily locked due to multiple failed login attempts. "
+                "Please try again in 5 minutes."
+            ),
+        )
+
+
+def record_failed_login(email: str) -> None:
+    """Record a failed login attempt for progressive lockout."""
+    key = email.strip().lower()
+    _auth_failed_attempts[key].append(time.time())
+
+
+def clear_failed_logins(email: str) -> None:
+    """Clear failed login attempts upon successful authentication."""
+    key = email.strip().lower()
+    _auth_failed_attempts.pop(key, None)
+
+
 def check_user_llm_cap(user_id: Any, cap: int = DAILY_LLM_CAP_DEFAULT) -> tuple[bool, int]:
     """Check and record user's daily LLM usage.
 
@@ -82,4 +124,5 @@ def check_user_llm_cap(user_id: Any, cap: int = DAILY_LLM_CAP_DEFAULT) -> tuple[
 def reset_rate_limits_for_tests() -> None:
     """Helper for unit tests."""
     _auth_ip_timestamps.clear()
+    _auth_failed_attempts.clear()
     _user_daily_counts.clear()

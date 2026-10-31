@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 class DraftMessageRequest(BaseModel):
-    vendor_category: str
-    vendor_name: str | None = None
-    custom_notes: str | None = None
+    vendor_category: str = Field(..., min_length=1, max_length=100)
+    vendor_name: str | None = Field(None, max_length=100)
+    custom_notes: str | None = Field(None, max_length=1000)
 
 
 class VendorInquiryDraft(BaseModel):

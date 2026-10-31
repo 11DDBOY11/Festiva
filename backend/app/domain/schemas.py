@@ -18,23 +18,35 @@ from pydantic import BaseModel, Field, field_validator
 class EventBrief(BaseModel):
     """Structured representation of a parsed event brief."""
 
-    title: str = Field(..., description="Title or event headline")
+    title: str = Field(..., max_length=100, description="Title or event headline")
     event_type: str = Field(..., pattern=r"^(wedding|birthday|community)$")
     event_date: date | None = Field(None, description="Event date (YYYY-MM-DD)")
-    city: str = Field("Mangaluru", description="Target city (defaults to Mangaluru)")
-    guest_count: int | None = Field(None, gt=0, description="Estimated guest count")
-    total_budget: Decimal | None = Field(None, gt=0, description="Total budget amount in INR")
-    currency: str = Field("INR", description="Currency code")
-    theme: str | None = Field(None, description="Event theme, styling, or vibe")
-    dietary_preferences: list[str] = Field(default_factory=list)
-    priorities: list[str] = Field(default_factory=list, description="Top spending/focus priorities")
-    constraints: list[str] = Field(
-        default_factory=list, description="Constraints e.g. outdoor, rain contingency"
+    city: str = Field(
+        "Mangaluru", max_length=100, description="Target city (defaults to Mangaluru)"
     )
-    raw_brief: str | None = Field(None, description="Original raw natural language text")
-    missing_fields: list[str] = Field(default_factory=list, description="Critical missing fields")
+    guest_count: int | None = Field(None, ge=1, le=10000, description="Estimated guest count")
+    total_budget: Decimal | None = Field(
+        None, ge=Decimal("1000"), le=Decimal("100000000"), description="Total budget amount in INR"
+    )
+    currency: str = Field("INR", max_length=3, description="Currency code")
+    theme: str | None = Field(None, max_length=100, description="Event theme, styling, or vibe")
+    dietary_preferences: list[str] = Field(default_factory=list, max_length=20)
+    priorities: list[str] = Field(
+        default_factory=list, max_length=20, description="Top spending/focus priorities"
+    )
+    constraints: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Constraints e.g. outdoor, rain contingency",
+    )
+    raw_brief: str | None = Field(
+        None, max_length=5000, description="Original raw natural language text"
+    )
+    missing_fields: list[str] = Field(
+        default_factory=list, max_length=20, description="Critical missing fields"
+    )
     clarifying_questions: list[str] = Field(
-        default_factory=list, description="Questions to ask user before generation"
+        default_factory=list, max_length=10, description="Questions to ask user before generation"
     )
 
     @field_validator("event_type", mode="before")

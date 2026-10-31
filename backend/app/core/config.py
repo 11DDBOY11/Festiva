@@ -29,11 +29,22 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL: str = "postgresql://festiva:festiva_dev@127.0.0.1:5432/festiva_test"
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
 
+    # --- CORS ---
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if not self.CORS_ORIGINS:
+            return ["http://localhost:5173", "http://127.0.0.1:5173"]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
     # --- Auth / JWT ---
     JWT_SECRET: str = "change-me-to-a-random-secret-key-32b"
     SECRET_KEY: str = "change-me-to-a-random-secret-key-32b"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ISSUER: str = "festiva-api"
+    JWT_AUDIENCE: str = "festiva-client"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- LLM ---
