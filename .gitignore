@@ -47,6 +47,7 @@ scratch/
 *.pdf
 *.mp4
 *.webp
+reel/
 
 # Alembic bytecode
 *.pyc
