@@ -200,6 +200,11 @@ export async function register(name: string, email: string, password: string): P
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
+    if (res.status === 429) {
+      throw new Error(
+        errorData.detail || "Too many requests from this IP. Please wait a minute and try again."
+      );
+    }
     throw new Error(errorData.detail || "Registration failed");
   }
   return res.json();
@@ -213,6 +218,11 @@ export async function login(email: string, password: string): Promise<TokenRespo
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
+    if (res.status === 429) {
+      throw new Error(
+        errorData.detail || "Too many login attempts. Please wait a minute and try again."
+      );
+    }
     throw new Error(errorData.detail || "Invalid email or password");
   }
   const data: TokenResponse = await res.json();

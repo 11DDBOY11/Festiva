@@ -55,7 +55,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       onDemoSuccess();
     } catch (err: any) {
       sessionStorage.removeItem("festiva_auto_open_demo");
-      setDemoError(err.message || "Failed to load demo. Please try logging in manually.");
+      const msg = err.message || "";
+      if (msg.includes("429") || msg.toLowerCase().includes("too many")) {
+        setDemoError("Too many demo login requests from this IP. Please wait a minute and try again.");
+      } else {
+        setDemoError(err.message || "Failed to load demo. Please try logging in manually.");
+      }
       setDemoLoading(false);
     }
   };

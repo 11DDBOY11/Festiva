@@ -83,6 +83,54 @@ def test_spoofed_x_forwarded_for_cannot_bypass_rate_limit():
     assert "Too many authentication requests" in exc_info.value.detail
 
 
+def test_trusted_proxy_hops_two_resolution_and_fallback(monkeypatch):
+    """Verify that TRUSTED_PROXY_HOPS=2 selects the 2nd entry from the right,
+
+    and falls back to request.client.host if fewer entries exist.
+    """
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    from app.core.config import settings
+    from app.core.rate_limit import _get_client_ip
+
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 2)
+
+    # 1. Test resolution with 3 hops: attacker, real_client, render_lb
+    header_val = b"attacker.ip, 198.51.100.77, 10.0.0.1"
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/auth/login",
+        "headers": [(b"x-forwarded-for", header_val)],
+        "client": ("10.0.0.1", 12345),
+    }
+    req = Request(scope)
+    resolved = _get_client_ip(req)
+    assert resolved == "198.51.100.77"
+
+    # Make 30 requests for this resolved IP to verify limit=30
+    for _ in range(30):
+        check_auth_rate_limit(req, limit=30, force_check=True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        check_auth_rate_limit(req, limit=30, force_check=True)
+    assert exc_info.value.status_code == 429
+
+    # 2. Test fallback when fewer than 2 hops exist in header
+    short_header = b"only_one_hop.ip"
+    scope_fallback = {
+        "type": "http",
+        "method": "POST",
+        "path": "/auth/login",
+        "headers": [(b"x-forwarded-for", short_header)],
+        "client": ("192.168.10.99", 12345),
+    }
+    req_fallback = Request(scope_fallback)
+    resolved_fallback = _get_client_ip(req_fallback)
+    assert resolved_fallback == "192.168.10.99"
+
+
 def test_user_llm_daily_cap_enforcement():
     """Verify that user LLM cap allows up to limit and rejects subsequent requests."""
     test_user_id = "user-abc-123"

@@ -37,7 +37,7 @@ flowchart TD
     Frontend <--> API[FastAPI Web Service]
 
     subgraph Security & Intake
-        API --> RateLimiter[Rate Limiter & Quota Guard\n15 auth/min • 50 LLM/day • Last Proxy Hop]
+        API --> RateLimiter[Rate Limiter & Quota Guard\n30 auth/min • 50 LLM/day • Trusted Proxy Hops]
         RateLimiter --> Auth[JWT HS256 Auth & Lockout Guard]
     end
 
@@ -74,6 +74,7 @@ flowchart TD
 
 ## 5. Live Demo & Visual Tour
 
+- **Live Demo:** `<LIVE_URL>` *(Hosted on Render Free Tier; web services spin down after inactivity and may take ~45–60 seconds to wake up on first visit)*.
 - **Repository:** [https://github.com/11DDBOY11/Festiva](https://github.com/11DDBOY11/Festiva) (Public, 1 branch `main`, < 4 MB)
 - **CI / GitHub Actions:** [https://github.com/11DDBOY11/Festiva/actions](https://github.com/11DDBOY11/Festiva/actions)
 - **Seeded Demo Account:**
@@ -149,7 +150,7 @@ python backend/tests/evals/eval_plan_diff.py --replay
 - **Strict Password & Auth Policy:** Enforces min 10 characters, rejects top common passwords, applies constant-time verification, and progressive lockout delays after repeated failures.
 - **Pinned JWT HS256 & Startup Guard:** Server strictly verifies `iss`, `aud`, and `exp`. Refuses boot in `production` if `JWT_SECRET` contains default placeholders.
 - **SSRF-Safe PDF Engine:** `xhtml2pdf` callback strictly whitelists the bundled DejaVu font, rejecting external network lookups or arbitrary file traversal.
-- **Proxy IP Rate Limiting:** Enforces 15 auth reqs/min and 50 LLM ops/day taking the client IP from the last entry appended by Render's trusted reverse proxy, preventing spoofed `X-Forwarded-For` headers from bypassing limits.
+- **Proxy IP Rate Limiting:** Enforces 30 auth reqs/min and 50 LLM ops/day taking the client IP from the Nth trusted hop of `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`, default 1), preventing spoofed headers from evading rate limits.
 
 ---
 

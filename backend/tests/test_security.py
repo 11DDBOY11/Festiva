@@ -232,6 +232,21 @@ def test_defensive_security_headers_present(client: TestClient) -> None:
     assert "X-Request-ID" in res.headers
 
 
+def test_strict_transport_security_in_production(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify Strict-Transport-Security is emitted on responses in production mode."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ENV", "production")
+    res = client.get("/health")
+    assert res.status_code == status.HTTP_200_OK
+    assert (
+        res.headers.get("Strict-Transport-Security")
+        == "max-age=31536000; includeSubDomains; preload"
+    )
+
+
 def test_payload_size_limit_rejects_oversized_request(client: TestClient) -> None:
     """Verify payload size limit: requests larger than 2MB return 413 Payload Too Large."""
     oversized_headers = {"Content-Length": str(3 * 1024 * 1024)}  # 3MB declared

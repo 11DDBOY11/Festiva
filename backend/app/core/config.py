@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     JWT_AUDIENCE: str = "festiva-client"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    TRUSTED_PROXY_HOPS: int = 1
 
     # --- LLM ---
     LLM_PROVIDER: str = "groq"  # groq | fake | openai | gemini

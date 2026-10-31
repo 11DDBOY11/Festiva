@@ -56,6 +56,7 @@ Vite bakes `VITE_API_URL` into static assets at build time. After saving `VITE_A
 | `GROQ_API_KEY` | `festiva-backend` | Yes | `gsk_...` | API key for Groq Llama-3.3-70B model. If unset or rate-limited, system falls back to deterministic rule engine. |
 | `DEMO_ACCOUNT_PASSWORD`| `festiva-backend` | No | `DemoFestiva2026!` | Password for pre-seeded account `demo@festiva.ai`. |
 | `CORS_ORIGINS` | `festiva-backend` | Yes | `https://festiva-frontend.onrender.com` | Strict CORS allowlist (comma-separated origins). |
+| `TRUSTED_PROXY_HOPS` | `festiva-backend` | No | `1` | Number of trusted proxy hops from the right of `X-Forwarded-For` (default `1` for Render's edge router; set to `2` if behind Cloudflare). |
 | `VITE_API_URL` | `festiva-frontend` | Yes | `https://festiva-backend.onrender.com` | Backend URL used by frontend API client at build time. |
 
 ---
@@ -91,7 +92,15 @@ alembic upgrade head && python -m app.db.seed && uvicorn app.main:app --host 0.0
 
 1. **Cold Starts:** Render Free Tier spins down web services after 15 minutes of inactivity. When a request arrives, spinning up the container takes ~40–50 seconds.
 2. **Frontend Auto-Retry:** `frontend/src/lib/api.ts` intercepts `502`, `503`, and `504` status codes and retries automatically for **up to 60 seconds** (12 attempts $\times$ 5s delay), displaying an accessible top banner with attempt countdown.
-3. **Proxy IP Rate Limiting:** Rate limiters in `app/core/rate_limit.py` inspect the **last hop** of `X-Forwarded-For` (appended by Render's trusted reverse proxy), preventing spoofed client headers from evading the 15 req/min auth limit.
+3. **Proxy IP Rate Limiting & Proxy Hops:**
+   - Rate limiters in `app/core/rate_limit.py` enforce 30 requests/minute per client IP for auth endpoints and account lockout.
+   - Behind Render's reverse proxy, the client IP is extracted from the $N$-th entry from the right of `X-Forwarded-For` ($N =$ `TRUSTED_PROXY_HOPS`, default `1`). If fewer entries exist, it safely falls back to `request.client.host`.
+   - **Reading the log line in Render:** On the first 5 auth requests (and at most once per minute thereafter), the backend logs a privacy-safe audit line in Render logs:
+     ```text
+     Auth IP resolution: x_forwarded_for_entries=2 resolved_ip=198.51.100.xxx (trusted_hops=1)
+     ```
+     The last octet is always masked (`.xxx`), and no authentication tokens or raw client credentials are ever logged.
+   - If you layer Cloudflare or another CDN in front of Render, set `TRUSTED_PROXY_HOPS: 2` in `festiva-backend`'s Environment settings so the real client IP (not Cloudflare's egress node) is targeted.
 
 ---
 
@@ -102,6 +111,12 @@ alembic upgrade head && python -m app.db.seed && uvicorn app.main:app --host 0.0
 - **Readiness Probe**: `GET /health/ready` $\rightarrow$ `{"status": "ready", "database": "connected"}`
 
 ### Checking Security Headers
+Run the automated security headers verification script:
+```bash
+python scripts/check_headers.py https://festiva-frontend-xxxx.onrender.com
+python scripts/check_headers.py https://festiva-backend-xxxx.onrender.com/health
+```
+Or via `curl`:
 ```bash
 curl -I https://festiva-frontend-xxxx.onrender.com
 ```
@@ -110,3 +125,5 @@ Expected headers:
 - `X-Frame-Options: DENY`
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
 - `Content-Security-Policy: default-src 'self'; ...`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`

@@ -35,6 +35,8 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
 
   # --------------------------------------------------------------------------
   # Static Site Frontend (Vite + React, CDN-hosted with security headers)
@@ -72,4 +74,4 @@ services:
         value: max-age=31536000; includeSubDomains; preload
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://festiva-backend.onrender.com https://*.onrender.com http://localhost:* http://127.0.0.1:* ws: wss:; frame-ancestors 'none';"
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.onrender.com http://localhost:* http://127.0.0.1:* ws: wss:; frame-ancestors 'none';"

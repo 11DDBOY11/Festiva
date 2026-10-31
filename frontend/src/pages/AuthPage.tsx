@@ -34,7 +34,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
       onAuthSuccess();
     } catch (err: any) {
-      setError(err.message || "Authentication failed. Please check your credentials.");
+      const msg = err.message || "";
+      if (msg.includes("429") || msg.toLowerCase().includes("too many")) {
+        setError("Too many requests from your IP. Please wait a minute and try again.");
+      } else {
+        setError(err.message || "Authentication failed. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }
