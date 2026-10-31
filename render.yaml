@@ -18,7 +18,6 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
-    region: oregon
     healthCheckPath: /health/ready
     envVars:
       - key: ENV
