@@ -15,9 +15,8 @@ from playwright.sync_api import sync_playwright
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-brain_dir = Path(r"C:\Users\dkk82\.gemini\antigravity\brain\c76ab51a-5c80-4fc8-bc0c-330b4acc9e08")
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-ARTIFACTS_DIR = brain_dir if brain_dir.exists() else (REPO_ROOT / ".artifacts")
+ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", str(REPO_ROOT / ".artifacts")))
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:3000")

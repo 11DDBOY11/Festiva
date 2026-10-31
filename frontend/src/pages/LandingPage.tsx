@@ -166,7 +166,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-16 sm:py-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
-            <h2 className="text-xs uppercase tracking-widest text-amber-600 dark:text-amber-400 font-bold mb-2">
+            <h2 className="text-xs uppercase tracking-widest text-amber-700 dark:text-amber-400 font-bold mb-2">
               Simple 3-Step Workflow
             </h2>
             <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
@@ -193,7 +193,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </p>
               </div>
               <div className="mt-6 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">Example: </span>
+                <span className="text-amber-700 dark:text-amber-400 font-semibold">Example: </span>
                 "21st birthday party, Mangaluru, 80 people, ₹75,000, outdoor evening with music"
               </div>
             </div>
@@ -261,7 +261,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-16 sm:py-24 bg-stone-50/60 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
-            <h2 className="text-xs uppercase tracking-widest text-amber-600 dark:text-amber-400 font-bold mb-2">
+            <h2 className="text-xs uppercase tracking-widest text-amber-700 dark:text-amber-400 font-bold mb-2">
               Built For Stress-Free Events
             </h2>
             <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
@@ -415,7 +415,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">Festiva</span>
               <span>— Celebration & Event Planning Copilot</span>
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
               Built with <span className="font-semibold text-slate-700 dark:text-slate-300">Google Antigravity</span>
             </p>
           </div>

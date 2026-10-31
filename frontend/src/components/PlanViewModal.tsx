@@ -350,6 +350,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     <History className="w-3.5 h-3.5" />
                     <span>Plan:</span>
                     <select
+                      aria-label="Select Plan Version"
                       value={selectedVersionNum}
                       onChange={(e) => handleSelectVersion(Number(e.target.value))}
                       className="bg-transparent text-amber-700 dark:text-amber-300 font-bold focus:outline-none cursor-pointer"
@@ -834,7 +835,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     </div>
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">{slot.activity}</h4>
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white">{slot.activity}</h3>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                           {slot.lead_person}
                         </span>
@@ -878,7 +879,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                                 {formatCategoryLabel(v.category)}
                               </span>
                               <div className="flex items-center gap-1.5">
-                                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{cleanVendorName}</h4>
+                                <h3 className="font-bold text-sm text-slate-900 dark:text-white">{cleanVendorName}</h3>
                                 {isSample && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                                     Sample Data
@@ -1045,9 +1046,9 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
 
                   {/* Summary */}
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
                       Change Summary
-                    </h4>
+                    </div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-amber-300 dark:border-amber-800 shadow-xs">
                       {activeProposal.diff.summary}
                     </p>

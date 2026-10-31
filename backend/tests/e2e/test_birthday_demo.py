@@ -29,8 +29,7 @@ E2E_DIR = Path(__file__).resolve().parent
 REPO_ROOT = E2E_DIR.parent.parent.parent
 
 # Target artifacts directory
-brain_dir = Path(r"C:\Users\dkk82\.gemini\antigravity\brain\c76ab51a-5c80-4fc8-bc0c-330b4acc9e08")
-ARTIFACTS_DIR = brain_dir if brain_dir.exists() else (REPO_ROOT / ".artifacts")
+ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", str(REPO_ROOT / ".artifacts")))
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:3000")
