@@ -86,6 +86,17 @@ export const EventsPage: React.FC = () => {
     }
   };
 
+  // Escape key handler for accessible modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalOpen) {
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen]);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -459,11 +470,17 @@ export const EventsPage: React.FC = () => {
 
       {/* Create Event Modal with AI Brief Parser */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-event-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto"
+        >
           <div className="glass-panel w-full max-w-lg rounded-2xl p-5 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-2xl glow-gold relative my-4 sm:my-8 bg-white dark:bg-slate-900">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg transition"
+              aria-label="Close dialog"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -472,7 +489,7 @@ export const EventsPage: React.FC = () => {
               <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
                 Event Intake
               </span>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">Start New Celebration</h2>
+              <h2 id="create-event-modal-title" className="text-xl font-bold text-slate-900 dark:text-white mt-1">Start New Celebration</h2>
             </div>
 
             {/* Intake Tabs */}

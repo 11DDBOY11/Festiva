@@ -140,6 +140,21 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
     };
   }, []);
 
+  // Escape key handler for accessible modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (draftModalData) {
+          setDraftModalData(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [draftModalData, onClose]);
+
   // Scroll active tab button smoothly into view on mobile / narrow viewports
   const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
   useEffect(() => {
@@ -693,13 +708,13 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="py-3 px-3 sm:px-4 font-bold">Category</th>
-                      <th className="py-3 px-3 sm:px-4 font-bold text-right">Share (%)</th>
-                      <th className="py-3 px-3 sm:px-4 font-bold text-right">Allocated Amount</th>
-                      <th className="py-3 px-3 sm:px-4 font-bold text-right hidden sm:table-cell">
+                      <th scope="col" className="py-3 px-3 sm:px-4 font-bold">Category</th>
+                      <th scope="col" className="py-3 px-3 sm:px-4 font-bold text-right">Share (%)</th>
+                      <th scope="col" className="py-3 px-3 sm:px-4 font-bold text-right">Allocated Amount</th>
+                      <th scope="col" className="py-3 px-3 sm:px-4 font-bold text-right hidden sm:table-cell">
                         Per Guest
                       </th>
-                      <th className="py-3 px-3 sm:px-4 font-bold hidden md:table-cell">Notes</th>
+                      <th scope="col" className="py-3 px-3 sm:px-4 font-bold hidden md:table-cell">Notes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -994,7 +1009,12 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
 
               {/* ACTIVE DIFF VIEWER CARD */}
               {activeProposal && (
-                <div className="p-5 rounded-2xl border-2 border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 space-y-4 shadow-xl">
+                <div
+                  role="region"
+                  aria-label="Proposed Plan Diff"
+                  aria-live="polite"
+                  className="p-5 rounded-2xl border-2 border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 space-y-4 shadow-xl"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 dark:border-amber-800/80 pb-3">
                     <div className="flex items-center gap-2">
                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900/80 text-amber-950 dark:text-amber-100 border border-amber-400 dark:border-amber-700">
@@ -1039,11 +1059,11 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                       <table className="w-full text-left text-xs sm:text-sm">
                         <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-700">
                           <tr>
-                            <th className="py-2.5 px-3 font-bold">Category</th>
-                            <th className="py-2.5 px-3 font-bold text-right">Current Allocation</th>
-                            <th className="py-2.5 px-3 font-bold text-center"></th>
-                            <th className="py-2.5 px-3 font-bold text-right">Proposed Allocation</th>
-                            <th className="py-2.5 px-3 font-bold text-right">Net Change</th>
+                            <th scope="col" className="py-2.5 px-3 font-bold">Category</th>
+                            <th scope="col" className="py-2.5 px-3 font-bold text-right">Current Allocation</th>
+                            <th scope="col" className="py-2.5 px-3 font-bold text-center"></th>
+                            <th scope="col" className="py-2.5 px-3 font-bold text-right">Proposed Allocation</th>
+                            <th scope="col" className="py-2.5 px-3 font-bold text-right">Net Change</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1228,7 +1248,12 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                 </div>
 
                 {/* Message Scroll Area */}
-                <div className="h-48 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-950/60 p-3 space-y-2.5 text-xs sm:text-sm border border-slate-200 dark:border-slate-800">
+                <div
+                  role="log"
+                  aria-live="polite"
+                  aria-label="Chat conversation history"
+                  className="h-48 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-950/60 p-3 space-y-2.5 text-xs sm:text-sm border border-slate-200 dark:border-slate-800"
+                >
                   {chatHistory.map((msg, i) => (
                     <div
                       key={i}
@@ -1316,7 +1341,12 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
 
         {/* Vendor Inquiry Draft Modal Dialog */}
         {draftModalData && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="draft-modal-title"
+            className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-xs animate-in fade-in"
+          >
             <div className="w-full max-w-2xl max-h-[85dvh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border-2 border-amber-400 dark:border-amber-600 shadow-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-amber-500/10">
                 <div className="flex items-center gap-2.5">
@@ -1324,7 +1354,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                    <h3 id="draft-modal-title" className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                       Draft Vendor Inquiry: {formatCategoryLabel(draftModalData.vendor_category)}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1335,6 +1365,7 @@ export const PlanViewModal: React.FC<PlanViewModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDraftModalData(null)}
+                  aria-label="Close draft message dialog"
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
                 >
                   <X className="w-5 h-5" />

@@ -84,8 +84,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <p className="text-xs text-slate-600 dark:text-slate-400">{user.email}</p>
               </div>
               <button
+                type="button"
                 onClick={() => logout()}
-                className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition"
+                aria-label="Log out"
+                className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition cursor-pointer"
                 title="Log out"
               >
                 <LogOut className="w-4 h-4" />
