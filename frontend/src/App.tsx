@@ -3,11 +3,12 @@ import { Navbar } from "./components/Navbar";
 import { AuthPage } from "./pages/AuthPage";
 import { EventsPage } from "./pages/EventsPage";
 import { LandingPage } from "./pages/LandingPage";
-import { User, getCurrentUser } from "./lib/api";
+import { User, getCurrentUser, ServerStatusDetail } from "./lib/api";
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serverStatus, setServerStatus] = useState<ServerStatusDetail | null>(null);
 
   // Navigation state for logged-out visitors
   const [loggedOutView, setLoggedOutView] = useState<"landing" | "login" | "register">(() => {
@@ -62,11 +63,22 @@ export const App: React.FC = () => {
       else if (hash === "" || hash === "#") setLoggedOutView("landing");
     };
 
+    const handleServerStatus = (e: Event) => {
+      const detail = (e as CustomEvent<ServerStatusDetail>).detail;
+      if (detail && detail.waking) {
+        setServerStatus(detail);
+      } else {
+        setServerStatus(null);
+      }
+    };
+
     window.addEventListener("festiva_auth_change", handleAuthChange);
     window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("festiva_server_status", handleServerStatus);
     return () => {
       window.removeEventListener("festiva_auth_change", handleAuthChange);
       window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("festiva_server_status", handleServerStatus);
     };
   }, []);
 
@@ -100,6 +112,18 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      {serverStatus?.waking && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="bg-amber-500 text-stone-950 px-4 py-2 text-xs font-semibold flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md"
+        >
+          <div className="w-2 h-2 rounded-full bg-stone-950 animate-ping" />
+          <span>
+            Waking up the server... Render free tier spins down after inactivity (attempt {serverStatus.attempt || 1}/{serverStatus.maxAttempts || 12}, ~60s). Please hold on...
+          </span>
+        </aside>
+      )}
       <Navbar
         user={currentUser}
         theme={theme}

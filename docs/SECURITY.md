@@ -96,3 +96,4 @@ All security assertions are verified in automated test runs:
 If you discover a security vulnerability in Festiva AI, please report it privately:
 * **Contact**: security@festiva.ai (or open a private security advisory on GitHub).
 * **Policy**: We commit to acknowledging receipt within 24 hours and providing an initial assessment and patch timeline within 72 hours. Please do not publish security disclosures publicly before an official fix has been released.
+

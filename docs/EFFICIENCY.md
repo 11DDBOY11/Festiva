@@ -38,3 +38,4 @@ Compiled via Vite + TypeScript (`npm run build`):
 - `dist/assets/index-BV-TthIe.css`: **47.84 kB** (gzip: 8.28 kB)
 - `dist/assets/index-CX6KMwdP.js`: **271.16 kB** (gzip: **72.32 kB**)
 - **Total Compressed JS Size**: **72.32 kB** (well under the 150 kB threshold).
+

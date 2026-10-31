@@ -14,7 +14,9 @@ from typing import Any
 from app.domain.category_labels import format_category_label
 from app.domain.schemas import VendorRecommendation
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
+_ROOT_DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
+_APP_DATA = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = _ROOT_DATA if _ROOT_DATA.exists() else _APP_DATA
 DEFAULT_VENDORS_JSON = DATA_DIR / "vendors.json"
 
 # Map budget/event category to vendor directory category

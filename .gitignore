@@ -25,16 +25,28 @@ Thumbs.db
 
 # Node
 node_modules/
+frontend/dist/
 
-# Docker
-*.log
+# Binaries & Tooling
+*.exe
+gitleaks*
+tools/
 
-# Testing
+# Testing & Logs
 .pytest_cache/
 .coverage
 htmlcov/
-tools/
+*.log
+logs/
+artifacts/
+.system_generated/
+scratch/
 *.zip
+
+# Media & Exports (no videos or raw PDFs in repo)
+*.pdf
+*.mp4
+*.webp
 
 # Alembic bytecode
 *.pyc

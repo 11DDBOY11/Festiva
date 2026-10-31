@@ -1,29 +1,75 @@
-services:
-  - type: web
-    name: festiva-backend
-    env: docker
-    dockerfilePath: Dockerfile
-    plan: free
-    healthCheckPath: /health
-    envVars:
-      - key: ENV
-        value: production
-      - key: JWT_SECRET
-        generateValue: true
-      - key: GROQ_API_KEY
-        sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: festiva-db
-          property: connectionString
-      - key: LLM_PROVIDER
-        value: groq
-      - key: LLM_MODEL
-        value: llama-3.3-70b-versatile
+# Render Blueprint Specification for Festiva AI
+# Docs: https://render.com/docs/blueprint-spec
+version: "1"
 
 databases:
   - name: festiva-db
     databaseName: festiva
     user: festiva
     plan: free
+    region: oregon
 
+services:
+  # --------------------------------------------------------------------------
+  # Dynamic Backend Web Service (Docker container, non-root user)
+  # --------------------------------------------------------------------------
+  - type: web
+    name: festiva-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: festiva-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DEMO_ACCOUNT_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+  # --------------------------------------------------------------------------
+  # Static Site Frontend (Vite + React, CDN-hosted with security headers)
+  # --------------------------------------------------------------------------
+  - type: web
+    name: festiva-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    plan: free
+    region: oregon
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains; preload
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://festiva-backend.onrender.com https://*.onrender.com http://localhost:* http://127.0.0.1:* ws: wss:; frame-ancestors 'none';"

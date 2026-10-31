@@ -2,7 +2,65 @@
  * API client with automatic token rotation, silent refresh, and session expiration handling.
  */
 
-const BASE_URL = "/api";
+const ENV_API_URL = (import.meta as any).env?.VITE_API_URL?.trim();
+const BASE_URL = ENV_API_URL ? ENV_API_URL.replace(/\/$/, "") : "/api";
+
+export interface ServerStatusDetail {
+  waking: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  message?: string;
+}
+
+function dispatchServerStatus(detail: ServerStatusDetail) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("festiva_server_status", { detail }));
+  }
+}
+
+/**
+ * Resilient fetch that intercepts 502/503/504 or network errors during Render free-tier cold starts.
+ * Retries up to ~60s (12 attempts * 5s delay).
+ */
+export async function resilientFetch(
+  url: string,
+  options?: RequestInit,
+  retryCount: number = 0
+): Promise<Response> {
+  const MAX_RETRIES = 12;
+  const RETRY_DELAY_MS = 5000;
+
+  try {
+    const res = await fetch(url, options);
+    if ((res.status === 502 || res.status === 503 || res.status === 504) && retryCount < MAX_RETRIES) {
+      dispatchServerStatus({
+        waking: true,
+        attempt: retryCount + 1,
+        maxAttempts: MAX_RETRIES,
+        message: "Waking up the server... Render free tier spins down after inactivity (~40-60s).",
+      });
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      return resilientFetch(url, options, retryCount + 1);
+    }
+    if (retryCount > 0) {
+      dispatchServerStatus({ waking: false });
+    }
+    return res;
+  } catch (err) {
+    if (retryCount < MAX_RETRIES) {
+      dispatchServerStatus({
+        waking: true,
+        attempt: retryCount + 1,
+        maxAttempts: MAX_RETRIES,
+        message: "Connecting to server... Waking up free-tier instance.",
+      });
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      return resilientFetch(url, options, retryCount + 1);
+    }
+    dispatchServerStatus({ waking: false });
+    throw err;
+  }
+}
 
 interface TokenResponse {
   access_token: string;
@@ -74,7 +132,7 @@ export async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      const res = await resilientFetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -116,14 +174,14 @@ export async function fetchWithAuth(
   }
   headers.set("Content-Type", "application/json");
 
-  let res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+  let res = await resilientFetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
   // If 401, attempt silent refresh once
   if (res.status === 401 && refreshToken) {
     token = await refreshAccessToken();
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
-      res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+      res = await resilientFetch(`${BASE_URL}${endpoint}`, { ...options, headers });
     }
   }
 
@@ -135,7 +193,7 @@ export async function fetchWithAuth(
 // ---------------------------------------------------------------------------
 
 export async function register(name: string, email: string, password: string): Promise<User> {
-  const res = await fetch(`${BASE_URL}/auth/register`, {
+  const res = await resilientFetch(`${BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
@@ -148,7 +206,7 @@ export async function register(name: string, email: string, password: string): P
 }
 
 export async function login(email: string, password: string): Promise<TokenResponse> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
+  const res = await resilientFetch(`${BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -477,7 +535,7 @@ export function streamPlanChat(
 
   (async () => {
     try {
-      const res = await fetch(`${BASE_URL}/events/${eventId}/chat`, {
+      const res = await resilientFetch(`${BASE_URL}/events/${eventId}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
