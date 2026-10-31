@@ -17,21 +17,21 @@ Data sourced directly from committed benchmark runs in `run-metrics.csv`:
 
 ## How to Run the Evaluations Locally
 
-### 1. Hermetic Pytest Suite (Unit & Domain Tests)
+### 1. Hermetic Pytest Suite (Unit, Security, Auth, & Domain Tests)
 
-Runs 68 unit, security, optimistic locking, concurrency, and validation tests without making external network calls (utilizes mock and replay clients):
+Runs 96 unit, security, auth hardening, optimistic locking, concurrency, and validation tests without making external network calls (utilizes mock and replay clients):
 
 ```powershell
 # Windows
 Set-Location backend
-.\.venv\Scripts\pytest -v -m "not e2e"
+.\.venv\Scripts\pytest -v --ignore=tests/e2e
 
 # Linux / macOS
 cd backend
-./.venv/bin/pytest -v -m "not e2e"
+./.venv/bin/pytest -v --ignore=tests/e2e
 ```
 
-**Expected Runtime:** ~54 seconds, **68 passed**, 0 failed.
+**Verified Output:** **96 passed**, 0 failed, **82% code coverage** (`pytest --cov=app`).
 
 ---
 

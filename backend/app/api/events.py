@@ -85,12 +85,20 @@ def create_event(
 
 @router.get("/", response_model=list[EventResponse])
 def list_events(
+    limit: int = Query(20, ge=1, le=100, description="Max events to return"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[Event]:
-    """List all events owned by the current user, newest first."""
+    """List events owned by the current user with limit/offset pagination, newest first."""
     return list(
-        db.execute(select(Event).where(Event.owner_id == user.id).order_by(Event.created_at.desc()))
+        db.execute(
+            select(Event)
+            .where(Event.owner_id == user.id)
+            .order_by(Event.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         .scalars()
         .all()
     )

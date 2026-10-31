@@ -8,11 +8,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.auth import router as auth_router
 from app.api.briefs import router as briefs_router
 from app.api.events import router as events_router
 from app.core.config import DEFAULT_SECRETS, settings
+from app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -107,5 +109,22 @@ app.include_router(briefs_router)
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str]:
-    """Health check endpoint for Docker / orchestration."""
+    """Lightweight health check endpoint for load balancers without DB hit."""
     return {"status": "ok", "project": settings.PROJECT_NAME, "env": settings.ENV}
+
+
+@app.get("/health/ready", tags=["system"])
+def readiness_check() -> dict[str, str]:
+    """Readiness probe checking database connectivity."""
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        logger.error("Readiness check failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "error": "Database unreachable"},
+        )
+    finally:
+        db.close()

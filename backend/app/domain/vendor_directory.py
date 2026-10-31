@@ -5,6 +5,7 @@ Enforces grounding integrity and price honesty ("to confirm" for missing prices)
 Zero LLM calls.
 """
 
+import functools
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -43,13 +44,20 @@ CATEGORY_MAP: dict[str, list[str]] = {
 }
 
 
-def load_vendor_records(path: Path | None = None) -> list[dict[str, Any]]:
-    """Load vendor records from vendors.json."""
-    target_path = path or DEFAULT_VENDORS_JSON
+@functools.lru_cache(maxsize=4)
+def _cached_load_vendor_records(path_str: str) -> tuple[dict[str, Any], ...]:
+    target_path = Path(path_str)
     if not target_path.exists():
-        return []
+        return ()
     with open(target_path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+        return tuple(data)
+
+
+def load_vendor_records(path: Path | None = None) -> list[dict[str, Any]]:
+    """Load vendor records from vendors.json, cached in memory."""
+    target_path = str(path or DEFAULT_VENDORS_JSON)
+    return [dict(v) for v in _cached_load_vendor_records(target_path)]
 
 
 def get_known_vendor_ids(vendors: list[dict[str, Any]] | None = None) -> set[str]:

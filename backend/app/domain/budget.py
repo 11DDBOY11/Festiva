@@ -5,6 +5,7 @@ tier, and guest count.
 """
 
 import csv
+import functools
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -53,12 +54,10 @@ class BudgetPlan:
         return {cat.category: cat.allocated_amount for cat in self.categories}
 
 
-def load_rules(csv_path: Path | str | None = None) -> list[CategoryRule]:
-    """Parse budget rules from CSV."""
-    path = Path(csv_path) if csv_path else DEFAULT_RULES_CSV
+@functools.lru_cache(maxsize=8)
+def _cached_load_rules(path_str: str) -> tuple[CategoryRule, ...]:
     rules: list[CategoryRule] = []
-
-    with open(path, encoding="utf-8") as f:
+    with open(path_str, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             per_guest = (
@@ -81,7 +80,13 @@ def load_rules(csv_path: Path | str | None = None) -> list[CategoryRule]:
                     min_amount=min_amt,
                 )
             )
-    return rules
+    return tuple(rules)
+
+
+def load_rules(csv_path: Path | str | None = None) -> list[CategoryRule]:
+    """Parse and return budget rules from CSV, cached in memory."""
+    path = str(Path(csv_path) if csv_path else DEFAULT_RULES_CSV)
+    return list(_cached_load_rules(path))
 
 
 def calculate_budget(
