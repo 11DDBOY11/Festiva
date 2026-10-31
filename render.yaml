@@ -18,6 +18,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    region: oregon
     healthCheckPath: /health/ready
     envVars:
       - key: ENV
@@ -47,7 +48,6 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     plan: free
-    region: oregon
     envVars:
       - key: VITE_API_URL
         sync: false
