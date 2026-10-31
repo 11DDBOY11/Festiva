@@ -27,11 +27,18 @@ _user_daily_counts: dict[str, int] = defaultdict(int)
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP respecting X-Forwarded-For when behind proxy."""
+    """Extract client IP taking the entry appended by the trusted reverse proxy (last hop).
+
+    Render (and standard reverse proxies) appends the connecting client's IP to the
+    end of the X-Forwarded-For header. Using the last entry prevents attackers from
+    bypassing IP-based rate limiting by prepending spoofed upstream IPs.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
-    if request.client:
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
+    if request.client and request.client.host:
         return request.client.host
     return "127.0.0.1"
 

@@ -451,11 +451,11 @@ export const EventsPage: React.FC = () => {
                   type="button"
                   onClick={() => handleViewPlan(event.id)}
                   disabled={loadingPlanEventId === event.id}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 px-3 py-1.5 rounded-lg transition"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/80 border border-amber-300 dark:border-amber-700 px-3 py-1.5 rounded-lg transition"
                 >
                   {loadingPlanEventId === event.id ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-900 dark:text-amber-200" />
                       <span>Loading...</span>
                     </>
                   ) : (
