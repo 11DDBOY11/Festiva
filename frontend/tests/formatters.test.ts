@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatINR, computeBudgetShare } from "../lib/formatters.ts";
+import { formatINR, computeBudgetShare } from "../src/lib/formatters.ts";
 
 test("formatINR formats numbers into Indian currency style", () => {
   assert.equal(formatINR(null), "₹0");

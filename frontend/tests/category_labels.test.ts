@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatCategoryLabel, CATEGORY_LABELS } from "../lib/constants.ts";
+import { formatCategoryLabel } from "../src/lib/constants.ts";
 
 test("formatCategoryLabel formats recognized categories", () => {
   assert.equal(formatCategoryLabel("venue"), "Venue");

@@ -68,3 +68,15 @@ jobs:
       - name: Run Benchmark Metrics Evaluation
         run: python tests/evals/run_metrics.py --replay
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Frontend build and test
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+          npm test
+
+
