@@ -48,6 +48,7 @@ scratch/
 *.mp4
 *.webp
 reel/
+demo/
 
 # Alembic bytecode
 *.pyc
